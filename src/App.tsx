@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { roleDetails, ROLE_ORDER, type Role } from './roles';
 import demoAccounts from './demo-accounts.json';
+import { useTheme } from './theme';
 
 type Profile = { role: Role; display_name: string | null; school_id: string | null };
 
@@ -151,6 +152,7 @@ function RoleDashboard({ profile, schoolName, email }: { profile: Profile; schoo
 
 export function App() {
   const { session, profile, schoolName, status } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [notice, setNotice] = useState('');
 
   async function signOut() {
@@ -164,13 +166,18 @@ export function App() {
         <a className="brand" href="#top">
           <span>◈</span> SENTINEL
         </a>
-        {session ? (
-          <button className="secondary" onClick={signOut}>
-            Sign out
+        <div className="header-actions">
+          <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+            {theme === 'dark' ? '☀' : '☾'} {theme === 'dark' ? 'Light' : 'Dark'} mode
           </button>
-        ) : (
-          <span className="tag">Safer schools. Stronger voices.</span>
-        )}
+          {session ? (
+            <button className="secondary" onClick={signOut}>
+              Sign out
+            </button>
+          ) : (
+            <span className="tag">Safer schools. Stronger voices.</span>
+          )}
+        </div>
       </header>
       <section className="hero" id="top">
         <p className="eyebrow">SCHOOL SAFETY & LEARNING ENVIRONMENT</p>
