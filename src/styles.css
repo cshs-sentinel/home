@@ -7,7 +7,6 @@
   --heading: #123a55;
   --brand: #0d4161;
   --muted: #4c6470;
-  --muted-2: #63737c;
   --eyebrow: #3b7a75;
   --accent: #e06e4c;
   --accent-ink: #ffffff;
@@ -17,28 +16,17 @@
   --line: #e2e9e5;
   --border: #d5dfdb;
   --border-strong: #b9cbc7;
-  --chip-active: #123f5e;
   --icon-bg: #e2f0e8;
   --icon-ink: #28706c;
   --tick: #3b8a78;
   --status-bg: #e6f3ed;
   --status-ink: #2b716b;
-  --urgent-bg: #fff0e7;
-  --urgent-ink: #b94e2e;
   --error: #b94e2e;
-  --notice: #1d625e;
   --link: #19556a;
   --shadow: #17354d12;
   --card-muted: #6d7d84;
   --list-muted: #526a76;
   --fine: #8a9aa0;
-  --pulse-bg: #123e5a;
-  --pulse-eyebrow: #a9dbce;
-  --pulse-muted: #bfd1d6;
-  --stat: #f3c982;
-  --report-muted: #586f7a;
-  --footer-muted: #6e7f83;
-  --footer-line: #e0e7e3;
   --input-bg: #ffffff;
   color-scheme: light;
   font-family: 'DM Sans', sans-serif;
@@ -53,7 +41,6 @@
   --heading: #e9f2f6;
   --brand: #9fd3e6;
   --muted: #a9bcc6;
-  --muted-2: #8ea2ad;
   --eyebrow: #7fc4b8;
   --accent: #e8805f;
   --accent-ink: #1a1009;
@@ -63,28 +50,17 @@
   --line: #263b48;
   --border: #33495a;
   --border-strong: #4a6272;
-  --chip-active: #6fb3d6;
   --icon-bg: #1f3a3a;
   --icon-ink: #8fd4c6;
   --tick: #6cc3ae;
   --status-bg: #1f3a33;
   --status-ink: #8fd4c6;
-  --urgent-bg: #3a221a;
-  --urgent-ink: #f0a183;
   --error: #f0a183;
-  --notice: #8fd4c6;
   --link: #8ccbe0;
   --shadow: #00000066;
   --card-muted: #8ea2ad;
   --list-muted: #a9bcc6;
   --fine: #7d909a;
-  --pulse-bg: #0b2a3d;
-  --pulse-eyebrow: #7fc4b8;
-  --pulse-muted: #9fb5be;
-  --stat: #f3c982;
-  --report-muted: #a9bcc6;
-  --footer-muted: #8ea2ad;
-  --footer-line: #263b48;
   --input-bg: #0f1d27;
   color-scheme: dark;
 }
@@ -105,7 +81,6 @@ header {
 .header-actions { display: flex; align-items: center; gap: 14px; }
 .brand { font-size: 19px; font-weight: 700; letter-spacing: .11em; color: var(--brand); text-decoration: none; }
 .brand span { color: #de7652; font-size: 25px; vertical-align: -2px; }
-.tag { color: var(--muted-2); font-size: 14px; }
 
 .theme-toggle {
   display: inline-flex;
@@ -121,22 +96,15 @@ header {
 }
 
 .hero {
-  padding: 100px max(28px, calc((100% - 1030px) / 2)) 126px;
+  padding: 90px max(28px, calc((100% - 1030px) / 2)) 70px;
   background: radial-gradient(circle at 85% 12%, var(--hero-glow) 0, transparent 28%), linear-gradient(116deg, var(--hero-from), var(--hero-to));
 }
-.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .15em; color: var(--eyebrow); margin: 0 0 15px; }
-.hero h1, .role-section h2, .pulse h2, .report h2 { font-family: Fraunces, serif; line-height: 1.02; letter-spacing: -.035em; }
-.hero h1 { font-size: clamp(46px, 6vw, 78px); max-width: 800px; margin: 0; color: var(--heading); }
-.lede { font-size: 19px; max-width: 600px; line-height: 1.6; color: var(--muted); margin: 26px 0 32px; }
-.hero button, .report button { border: 0; border-radius: 5px; background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 15px 20px; }
-.hero button span, .report button span { padding-left: 15px; font-size: 18px; }
-.notice { color: var(--notice); font-weight: 600; }
+.hero h1 { font-family: Fraunces, serif; font-size: clamp(40px, 5.5vw, 64px); line-height: 1.05; letter-spacing: -.035em; max-width: 760px; margin: 0; color: var(--heading); }
+.lede { font-size: 18px; max-width: 560px; line-height: 1.6; color: var(--muted); margin: 22px 0 0; }
 
-.role-section { max-width: 1100px; margin: 0 auto; padding: 90px 28px; }
-.role-section h2, .pulse h2, .report h2 { font-size: 43px; margin: 0 0 34px; }
-.role-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 28px; }
-.role-tabs span { border: 1px solid var(--border); background: var(--surface); border-radius: 30px; padding: 10px 15px; color: var(--muted); font-size: 13px; }
-.role-tabs .active { background: var(--chip-active); color: var(--bg); border-color: var(--chip-active); }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .15em; color: var(--eyebrow); margin: 0 0 15px; }
+
+.access { max-width: 1100px; margin: 0 auto; padding: 56px 28px 90px; }
 
 .login-card { max-width: 440px; padding: 34px; border-radius: 14px; background: var(--surface); box-shadow: 0 12px 32px var(--shadow); }
 .login-card h3 { font-family: Fraunces, serif; font-size: 26px; margin: 0 0 20px; }
@@ -158,34 +126,15 @@ header {
 .dashboard li:before { content: '✓'; color: var(--tick); font-weight: bold; margin-right: 9px; }
 .dashboard aside { border-left: 1px solid var(--line); padding-left: 25px; display: flex; align-items: flex-start; flex-direction: column; }
 .status { font-size: 11px; color: var(--status-ink); background: var(--status-bg); padding: 5px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
-.urgent { background: var(--urgent-bg); color: var(--urgent-ink); }
 .dashboard aside strong { font-size: 18px; margin-top: 13px; }
 .dashboard aside p { color: var(--card-muted); font-size: 13px; }
 .fine-print { font-size: 11px; color: var(--fine); margin-top: 10px; }
+
 .secondary { background: none; border: 1px solid var(--border-strong); border-radius: 5px; padding: 8px 10px; color: var(--link); font-weight: 600; }
-
-.pulse { background: var(--pulse-bg); color: #ffffff; padding: 86px max(28px, calc((100% - 1030px) / 2)); }
-.pulse .eyebrow { color: var(--pulse-eyebrow); }
-.pulse h2 { max-width: 530px; }
-.stats { display: flex; gap: 70px; margin-top: 45px; }
-.stats div { display: flex; flex-direction: column; }
-.stats strong { font-family: Fraunces, serif; font-size: 51px; color: var(--stat); }
-.stats span { color: var(--pulse-muted); margin-top: 5px; }
-
-.report { display: flex; gap: 40px; justify-content: space-between; align-items: center; max-width: 1100px; padding: 90px 28px; margin: auto; }
-.report h2 { margin-bottom: 12px; }
-.report p:last-child { max-width: 600px; line-height: 1.6; color: var(--report-muted); }
-
-footer { padding: 30px; text-align: center; color: var(--footer-muted); font-size: 13px; border-top: 1px solid var(--footer-line); }
-footer span { padding: 0 8px; }
 
 @media (max-width: 740px) {
   header { padding: 0 20px; }
-  .tag { display: none; }
-  .hero { padding-top: 70px; }
+  .hero { padding-top: 60px; }
   .dashboard { grid-template-columns: 1fr; }
   .dashboard aside { border-left: 0; border-top: 1px solid var(--line); padding: 20px 0 0; }
-  .stats { gap: 25px; flex-wrap: wrap; }
-  .report { align-items: flex-start; flex-direction: column; }
-  .role-section h2, .pulse h2, .report h2 { font-size: 36px; }
 }

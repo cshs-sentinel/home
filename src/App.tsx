@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
-import { roleDetails, ROLE_ORDER, type Role } from './roles';
+import { roleDetails, type Role } from './roles';
 import demoAccounts from './demo-accounts.json';
 import { useTheme } from './theme';
 
 type Profile = { role: Role; display_name: string | null; school_id: string | null };
-
-const stats = [['86%', 'Survey response rate'], ['12', 'Reports being handled'], ['4', 'Pending approvals']];
 
 function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
@@ -62,7 +60,7 @@ function useAuth() {
   return { session, profile, schoolName, status };
 }
 
-function LoginCard({ onLoggedIn }: { onLoggedIn: () => void }) {
+function LoginCard() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -79,9 +77,7 @@ function LoginCard({ onLoggedIn }: { onLoggedIn: () => void }) {
     setSubmitting(false);
     if (signInError) {
       setError(signInError.message);
-      return;
     }
-    onLoggedIn();
   }
 
   return (
@@ -153,12 +149,6 @@ function RoleDashboard({ profile, schoolName, email }: { profile: Profile; schoo
 export function App() {
   const { session, profile, schoolName, status } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [notice, setNotice] = useState('');
-
-  async function signOut() {
-    await supabase.auth.signOut();
-    setNotice('');
-  }
 
   return (
     <main>
@@ -170,72 +160,27 @@ export function App() {
           <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
             {theme === 'dark' ? '☀' : '☾'} {theme === 'dark' ? 'Light' : 'Dark'} mode
           </button>
-          {session ? (
-            <button className="secondary" onClick={signOut}>
+          {session && (
+            <button className="secondary" onClick={() => supabase.auth.signOut()}>
               Sign out
             </button>
-          ) : (
-            <span className="tag">Safer schools. Stronger voices.</span>
           )}
         </div>
       </header>
       <section className="hero" id="top">
-        <p className="eyebrow">SCHOOL SAFETY & LEARNING ENVIRONMENT</p>
         <h1>Every voice can help build a safer school.</h1>
-        <p className="lede">
-          SENTINEL brings surveys, incident reporting, alerts, and safety action together in one trusted place.
-        </p>
-        {!session && (
-          <button onClick={() => setNotice('Log in below, or try a demo account for any role.')}>
-            Explore the preview <span>→</span>
-          </button>
-        )}
-        {notice && <p className="notice">{notice}</p>}
+        <p className="lede">SENTINEL brings surveys, incident reporting, and alerts together in one place.</p>
       </section>
-      <section className="role-section" aria-labelledby="roles-heading">
-        <p className="eyebrow">ROLE-BASED ACCESS</p>
-        <h2 id="roles-heading">One system, clear responsibilities.</h2>
-        {status === 'loading' && <p>Loading your dashboard…</p>}
-        {status === 'ready' && !session && <LoginCard onLoggedIn={() => setNotice('')} />}
+      <section className="access">
+        {status === 'loading' && <p>Loading…</p>}
+        {status === 'ready' && !session && <LoginCard />}
         {status === 'ready' && session && profile && (
           <RoleDashboard profile={profile} schoolName={schoolName} email={session.user.email ?? ''} />
         )}
         {status === 'ready' && session && !profile && (
           <p className="error-text">Signed in, but no profile was found for this account.</p>
         )}
-        <div className="role-tabs" role="list" aria-label="All roles in SENTINEL">
-          {ROLE_ORDER.map((role) => (
-            <span className={profile?.role === role ? 'active' : ''} key={role}>
-              {roleDetails[role].label}
-            </span>
-          ))}
-        </div>
       </section>
-      <section className="pulse">
-        <p className="eyebrow">SCHOOL PULSE</p>
-        <h2>See concerns early. Respond with confidence.</h2>
-        <div className="stats">
-          {stats.map(([value, label]) => (
-            <div key={label}>
-              <strong>{value}</strong>
-              <span>{label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="report">
-        <div>
-          <p className="eyebrow">COMMUNITY REPORTING</p>
-          <h2>See something unsafe?</h2>
-          <p>Report a hazard, safety concern, or wellbeing issue. You can choose to share contact details or submit anonymously.</p>
-        </div>
-        <button onClick={() => setNotice('Preview: this will open the secure incident and hazard report form.')}>
-          Make a report <span>→</span>
-        </button>
-      </section>
-      <footer>
-        © 2026 SENTINEL <span>•</span> Safe, respectful, and motivating learning environments
-      </footer>
     </main>
   );
 }
