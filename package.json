@@ -1,0 +1,39 @@
+{
+  "name": "sentinel",
+  "version": "1.0.0",
+  "description": "An instant survey system: respondents submit answers and the server analyzes results in real time.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "deploy:preview": "npm run build && wrangler deploy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cshs-sentinel/home.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cshs-sentinel/home/issues"
+  },
+  "homepage": "https://github.com/cshs-sentinel/home#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.64.0",
+    "@cloudflare/workers-types": "^5.20261021.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "wrangler": "^4.151.3"
+  }
+}
