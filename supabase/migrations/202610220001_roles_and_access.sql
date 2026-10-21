@@ -1,5 +1,14 @@
 -- SENTINEL authorization foundation.
 -- Apply with `supabase db push` after linking this repository to the Supabase project.
+--
+-- NOTE (2026-10-22): the connected Supabase project's live schema has diverged from this
+-- file — it uses a single `app_role` enum on `profiles.role` (student/teacher/non_teaching/
+-- security/drrm/guidance/school_admin/system_admin) rather than the `sentinel_role` type and
+-- separate `user_roles`/`role_audit_log` tables defined below, and already has additional
+-- tables (schools, incidents, submissions, alerts, schedules, audit_logs, ...) not tracked
+-- here. Do not run this migration against that project as-is. See
+-- docs/roles-and-permissions.md for the roles actually enforced, and consider a
+-- `supabase db pull` to resync migration history with reality.
 
 create type public.sentinel_role as enum (
   'school_community',

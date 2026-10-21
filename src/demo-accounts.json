@@ -1,0 +1,14 @@
+{
+  "password": "Sentinel!Demo1",
+  "schoolId": "11111111-1111-1111-1111-111111111111",
+  "accounts": [
+    { "role": "student", "email": "demo.student@sentinel.test", "displayName": "Demo Student" },
+    { "role": "teacher", "email": "demo.teacher@sentinel.test", "displayName": "Demo Teacher" },
+    { "role": "non_teaching", "email": "demo.nonteaching@sentinel.test", "displayName": "Demo Non-Teaching Staff" },
+    { "role": "security", "email": "demo.security@sentinel.test", "displayName": "Demo Security" },
+    { "role": "drrm", "email": "demo.drrm@sentinel.test", "displayName": "Demo DRRM Coordinator" },
+    { "role": "guidance", "email": "demo.guidance@sentinel.test", "displayName": "Demo Guidance Counselor" },
+    { "role": "school_admin", "email": "demo.schooladmin@sentinel.test", "displayName": "Demo School Admin" },
+    { "role": "system_admin", "email": "demo.systemadmin@sentinel.test", "displayName": "Demo System Admin" }
+  ]
+}
