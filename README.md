@@ -36,22 +36,19 @@ ICT Coordinator and maps each one to a role. See
   starts closed: a System Admin opens it per position in Setup › Positions.
 - Admins are created by other admins (People tab) or by the System Admin.
 
-Demo accounts already exist in the connected project. From the login card on the homepage, open
-"Try a demo account for each role" to sign in with one click, or sign in manually with the
-password `Sentinel!Demo1`:
+There is one demo account for each role. From the login card on the homepage, open "Try a demo
+account for each role" to sign in with one click, or sign in manually with the password
+`Sentinel!Demo1`:
 
-| Role | Email |
-| --- | --- |
-| Community Member (Student) | demo.student@sentinel.test |
-| Community Member (Non-Teaching Staff) | demo.nonteaching@sentinel.test |
-| School Admin (DRRM Coordinator) | demo.teacher@sentinel.test and demo.drrm@sentinel.test |
-| School Admin (Security) | demo.security@sentinel.test |
-| School Admin (Guidance Counselor) | demo.guidance@sentinel.test |
-| School Admin | demo.schooladmin@sentinel.test |
-| System Admin | demo.systemadmin@sentinel.test |
+| Role | Email | Position |
+| --- | --- | --- |
+| Community Member | demo.student@sentinel.test | Student |
+| School Admin | demo.schooladmin@sentinel.test | School Admin |
+| System Admin | demo.systemadmin@sentinel.test | System Admin |
 
-`demo.teacher` currently holds the DRRM Coordinator position (and so the School Admin role). Assign it
-the Teacher position in the People tab if you want it to be a Community Member.
+Earlier demo logins (teacher, non-teaching, security, DRRM, guidance) were retired on 2026-10-23.
+They are blocked from signing in and hidden from People, but not deleted, because they own
+activity-log rows.
 
 These are synthetic, non-production accounts for demoing the app, not real identities. To
 (re)create them, run:
@@ -61,7 +58,7 @@ node scripts/seed-sample-accounts.mjs
 ```
 
 The script is idempotent. It reads `src/demo-accounts.json`, marks accounts as admin-provisioned,
-and re-syncs each account's position and role. It requires `SUPABASE_SERVICE_ROLE_KEY` in `.env`.
+re-syncs each account's position and role, and retires the emails listed under `retired`. It requires `SUPABASE_SERVICE_ROLE_KEY` in `.env`.
 
 ## Tests
 

@@ -1,6 +1,8 @@
-// One-off/idempotent seed script: creates (or re-syncs) demo logins for the
-// three primary roles (Community Member, School Admin, System Admin) with a
-// designation each, so every role in docs/roles-and-permissions.md can be
+// One-off/idempotent seed script: creates (or re-syncs) one demo login for each
+// of the three primary roles (Community Member, School Admin, System Admin) with a
+// designation each. Accounts listed under "retired" in demo-accounts.json are
+// deactivated and blocked from signing in rather than deleted, because they own
+// audit-log rows, so every role in docs/roles-and-permissions.md can be
 // signed in and previewed. Accounts are marked app_metadata.provisioned =
 // 'admin', which the sign-up trigger requires for accounts that are created
 // without registration details (only the service key can set it). Requires SUPABASE_SERVICE_ROLE_KEY — run locally only,
@@ -36,7 +38,7 @@ if (!url || !serviceKey) {
   process.exit(1);
 }
 
-const { password, schoolId, accounts } = JSON.parse(
+const { password, schoolId, accounts, retired = [] } = JSON.parse(
   readFileSync(join(projectRoot, 'src', 'demo-accounts.json'), 'utf8'),
 );
 
@@ -92,6 +94,16 @@ for (const account of accounts) {
   if (profileError) throw profileError;
 
   results.push({ role: designation?.base_role ?? account.role, designation: account.designation, email: account.email, status: created ? 'created' : 'already existed' });
+}
+
+for (const email of retired) {
+  const existing = await findUserByEmail(email);
+  if (!existing) continue;
+  const { error: banError } = await admin.auth.admin.updateUserById(existing.id, { ban_duration: '876000h' });
+  if (banError) throw banError;
+  const { error: offError } = await admin.from('profiles').update({ is_active: false }).eq('id', existing.id);
+  if (offError) throw offError;
+  results.push({ role: '-', designation: '-', email, status: 'retired (blocked, history kept)' });
 }
 
 console.table(results);

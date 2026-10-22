@@ -80,10 +80,10 @@ async function seedActivity() {
   // Demo accounts are looked up by email; roles are Community Member (reporters)
   // and School Admin (responders).
   const idFor = (key) => users.find((u) => u.email === `demo.${key}@sentinel.test`)?.id;
-  const reporters = ['student', 'teacher', 'nonteaching'].map(idFor).filter(Boolean);
+  const reporters = ['student'].map(idFor).filter(Boolean);
   const student = idFor('student');
-  const security = idFor('security');
-  const guidance = idFor('guidance');
+  const security = idFor('schooladmin');
+  const guidance = security;
   if (!student || !security || !guidance) throw new Error('Demo accounts missing. Run scripts/seed-sample-accounts.mjs first.');
 
   const locations = await must(admin.from('locations').select('id, name, environment').eq('school_id', schoolId).eq('status', 'active'));

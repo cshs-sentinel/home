@@ -82,7 +82,7 @@ flowchart LR
 | External data | `src/lib/weather.ts` | Open-Meteo and USGS clients, heat index, PAGASA levels |
 | Data access | `src/lib/data.ts` | Role-aware loading and every write the app performs |
 | Theme | `src/theme.ts` | Light, Dark, and Neon themes |
-| Demo accounts | `scripts/seed-sample-accounts.mjs` | One login per role |
+| Demo accounts | `scripts/seed-sample-accounts.mjs` | One login per role; retired logins are blocked, not deleted |
 | Demo activity | `scripts/seed-demo-activity.mjs` | 14 days of synthetic, tagged activity; `--clean` removes it |
 | Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types; `0004` adds map layout fields; `0005` sets the Campus › Building › Floor › Room hierarchy; `0006` added privacy-safe sentiment totals (dropped by `0011`); `0007` adds the incident Priority Index; `0008` and `0009` set the default location types and the Area tier; `0010` and `0011` move the app to three roles, positions, validated registration, and the default location |
 
@@ -461,7 +461,7 @@ demo activity live.
 7. **Reporters cannot see past submissions.** No RLS policy lets a sender read their own
    feelings or reports. The app shows only their incidents and check-ins.
 8. **Demo accounts share the real school.** The demo campus, demo activity, and original sample
-   rows were deleted on 2026-10-22. The 8 demo accounts still sign in to the same school as the
+   rows were deleted on 2026-10-22. The 3 demo accounts (one per role) still sign in to the same school as the
    real Cabiao SHS setup, so anything they report lands in real analytics. A separate test
    school would keep them apart.
 9. **Limited automated tests.** `npm test` runs unit tests for roles, features, and locations.

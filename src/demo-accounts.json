@@ -6,37 +6,7 @@
       "role": "community",
       "designation": "Student",
       "email": "demo.student@sentinel.test",
-      "displayName": "Demo Student"
-    },
-    {
-      "role": "community",
-      "designation": "Non-Teaching Staff",
-      "email": "demo.nonteaching@sentinel.test",
-      "displayName": "Demo Non-Teaching Staff"
-    },
-    {
-      "role": "school_admin",
-      "designation": "DRRM Coordinator",
-      "email": "demo.teacher@sentinel.test",
-      "displayName": "Demo Teacher"
-    },
-    {
-      "role": "school_admin",
-      "designation": "Security",
-      "email": "demo.security@sentinel.test",
-      "displayName": "Demo Security"
-    },
-    {
-      "role": "school_admin",
-      "designation": "DRRM Coordinator",
-      "email": "demo.drrm@sentinel.test",
-      "displayName": "Demo DRRM Coordinator"
-    },
-    {
-      "role": "school_admin",
-      "designation": "Guidance Counselor",
-      "email": "demo.guidance@sentinel.test",
-      "displayName": "Demo Guidance Counselor"
+      "displayName": "Demo Community Member"
     },
     {
       "role": "school_admin",
@@ -50,5 +20,12 @@
       "email": "demo.systemadmin@sentinel.test",
       "displayName": "Demo System Admin"
     }
+  ],
+  "retired": [
+    "demo.nonteaching@sentinel.test",
+    "demo.teacher@sentinel.test",
+    "demo.security@sentinel.test",
+    "demo.drrm@sentinel.test",
+    "demo.guidance@sentinel.test"
   ]
 }

@@ -7,6 +7,7 @@ export type Profile = {
   school_id: string | null;
   user_type_id: string | null;
   primary_location_id: string | null;
+  is_active?: boolean;
 };
 
 // A designation (position). It maps to exactly one primary role.

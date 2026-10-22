@@ -66,7 +66,7 @@ export function useSchoolData(profile: Profile) {
         .order('created_at', { ascending: false })
         .limit(100),
       managesPeople
-        ? supabase.from('profiles').select('id, role, display_name, school_id, user_type_id, primary_location_id').order('display_name')
+        ? supabase.from('profiles').select('id, role, display_name, school_id, user_type_id, primary_location_id, is_active').order('display_name')
         : Promise.resolve({ data: [], error: null }),
       managesPeople
         ? supabase.from('user_types').select(USER_TYPE_COLUMNS).order('name')

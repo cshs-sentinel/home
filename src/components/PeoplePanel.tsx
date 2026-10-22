@@ -22,8 +22,10 @@ export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; da
     setMessage(r.error ?? `${person.display_name ?? 'User'} is now ${type.name}.`);
   }
 
+  // Deactivated accounts (for example retired demo logins) are kept for the activity log but not listed.
+  const people = data.people.filter((p) => p.is_active !== false);
   const counts = data.userTypes
-    .map((t) => ({ type: t, n: data.people.filter((p) => p.user_type_id === t.id).length }))
+    .map((t) => ({ type: t, n: people.filter((p) => p.user_type_id === t.id).length }))
     .filter((c) => c.n > 0);
 
   return (
@@ -39,7 +41,7 @@ export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; da
         </div>
         {message && <p className="notice">{message}</p>}
         <ul className="queue-list">
-          {data.people.map((p) => {
+          {people.map((p) => {
             const type = p.user_type_id ? typeById.get(p.user_type_id) : undefined;
             const locked = p.id === profile.id || (p.role === 'system_admin' && !isSystemAdmin);
             return (
