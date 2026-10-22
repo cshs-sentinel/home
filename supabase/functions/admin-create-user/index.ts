@@ -1,9 +1,10 @@
 // Adds a person directly, without public sign-up: a School Admin or System
-// Admin supplies an email, name, and position. School Admin can only use a
-// Community Member position; only a System Admin can add a School Admin or
-// System Admin. The account is created with a random, discarded password,
-// and a one-time recovery link is generated so the new person sets their own
-// password -- no password is ever typed, stored, or shown in plain text.
+// Admin supplies an email, name, position, and an optional default location.
+// School Admin can only use a Community Member position; only a System
+// Admin can add a School Admin or System Admin. The account is created with
+// a random, discarded password, and a one-time recovery link is generated
+// so the new person sets their own password -- no password is ever typed,
+// stored, or shown in plain text.
 //
 // The registration trigger (handle_new_user, migration 0014) only skips the
 // sign-up form and approves an account immediately when user_metadata
@@ -39,7 +40,7 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization') ?? '';
   if (!authHeader.startsWith('Bearer ')) return json({ error: 'Sign in required' }, 401);
 
-  let body: { email?: string; display_name?: string; designation_id?: string };
+  let body: { email?: string; display_name?: string; designation_id?: string; default_location_id?: string };
   try {
     body = await req.json();
   } catch {
@@ -49,6 +50,7 @@ Deno.serve(async (req) => {
   const email = (body.email ?? '').trim().toLowerCase();
   const displayName = (body.display_name ?? '').trim();
   const designationId = (body.designation_id ?? '').trim();
+  const locationId = (body.default_location_id ?? '').trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Enter a valid email address' }, 400);
   if (displayName.length < 2 || displayName.length > 120) return json({ error: 'Enter a name (2 to 120 characters)' }, 400);
   if (!designationId) return json({ error: 'Choose a position' }, 400);
@@ -83,6 +85,16 @@ Deno.serve(async (req) => {
     return json({ error: 'Only a System Admin can add a School Admin or System Admin' }, 403);
   }
 
+  // Optional: the trigger also re-checks this and silently drops it if
+  // invalid, so a bad id here just means no default location is set.
+  let validLocationId: string | null = null;
+  if (locationId) {
+    const { data: location } = await asCaller.from('locations').select('id, school_id, status, access_level').eq('id', locationId).maybeSingle();
+    if (location && location.school_id === callerProfile.school_id && location.status === 'active' && location.access_level !== 'restricted') {
+      validLocationId = location.id;
+    }
+  }
+
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 
   const { data: secretRow, error: secretError } = await admin.from('_provision_secrets').select('secret').eq('id', true).maybeSingle();
@@ -94,7 +106,7 @@ Deno.serve(async (req) => {
     password: tempPassword,
     email_confirm: true,
     app_metadata: { provisioned: 'admin' },
-    user_metadata: { provision_secret: secretRow.secret, designation_id: designation.id, display_name: displayName },
+    user_metadata: { provision_secret: secretRow.secret, designation_id: designation.id, display_name: displayName, default_location_id: validLocationId },
   });
   if (createError) {
     const already = createError.message?.toLowerCase().includes('already') || createError.code === 'email_exists';

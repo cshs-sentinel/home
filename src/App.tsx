@@ -15,6 +15,7 @@ import { MoreMenu } from './components/MoreMenu';
 import { QueuePanel } from './components/QueuePanel';
 import { AlertsPanel } from './components/AlertsPanel';
 import { PeoplePanel } from './components/PeoplePanel';
+import { MyLocationApprovals } from './components/MyLocationApprovals';
 import { SetupPanel } from './components/SetupPanel';
 import { effectiveFeatures, navFor } from './lib/features';
 
@@ -173,6 +174,14 @@ function Workspace({ profile, schoolName, email, userType, onProfileChanged }: {
   const details = roleDetails[profile.role];
   const features = useMemo(() => effectiveFeatures(profile.role, userType?.features ?? null), [profile.role, userType]);
   const nav = navFor(features);
+  // A Classroom Adviser (or any Community Member position with
+  // can_approve_own_location) gets the People tab too, scoped to just their
+  // own location's pending approvals -- otherwise community accounts never
+  // see People at all.
+  const isLocationApprover = profile.role === 'community' && userType?.can_approve_own_location === true;
+  if (isLocationApprover && !nav.primary.includes('people') && !nav.more.includes('people')) {
+    nav.more = [...nav.more, 'people'];
+  }
   const tabs = [...nav.primary, ...nav.more];
   const [tab, setTab] = useState<Tab>(nav.primary[0] ?? 'report');
   const [days, setDays] = useState<Range>(14);
@@ -238,7 +247,7 @@ function Workspace({ profile, schoolName, email, userType, onProfileChanged }: {
         {tab === 'alerts' && tabs.includes('alerts') && (
           <AlertsPanel profile={profile} features={features} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} initialTemplate={template} onChanged={reload} />
         )}
-        {tab === 'people' && tabs.includes('people') && <PeoplePanel profile={profile} data={data} onChanged={reload} />}
+        {tab === 'people' && tabs.includes('people') && (isLocationApprover ? <MyLocationApprovals /> : <PeoplePanel profile={profile} data={data} onChanged={reload} />)}
         {tab === 'setup' && tabs.includes('setup') && <SetupPanel profile={profile} features={features} people={data.people} onPeopleChanged={reload} />}
       </div>
     </div>

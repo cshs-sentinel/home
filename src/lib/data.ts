@@ -6,7 +6,7 @@ import type { Role } from '../roles';
 
 const HISTORY_DAYS = 60;
 
-export const USER_TYPE_COLUMNS = 'id, name, description, base_role, features, is_active, is_system, selectable_at_signup, authorized_privileged';
+export const USER_TYPE_COLUMNS = 'id, name, description, base_role, features, is_active, is_system, selectable_at_signup, authorized_privileged, can_approve_own_location';
 
 const READS_SUBMISSIONS: Role[] = ['school_admin'];
 const MANAGES_PEOPLE: Role[] = ['school_admin', 'system_admin'];
@@ -274,7 +274,7 @@ export async function saveLocationType(
 
 export async function saveUserType(
   profile: Profile,
-  input: { id?: string; name: string; description: string; baseRole: Role; features: string[]; isActive: boolean; selectableAtSignup: boolean; authorizedPrivileged: boolean },
+  input: { id?: string; name: string; description: string; baseRole: Role; features: string[]; isActive: boolean; selectableAtSignup: boolean; authorizedPrivileged: boolean; canApproveOwnLocation: boolean },
 ): Promise<Result> {
   const row = {
     name: input.name.trim(),
@@ -284,6 +284,7 @@ export async function saveUserType(
     is_active: input.isActive,
     selectable_at_signup: input.baseRole === 'community' && input.selectableAtSignup,
     authorized_privileged: input.baseRole === 'system_admin' && input.authorizedPrivileged,
+    can_approve_own_location: input.baseRole === 'community' && input.canApproveOwnLocation,
   };
   const { error } = input.id
     ? await supabase.from('user_types').update(row).eq('id', input.id)
@@ -317,13 +318,39 @@ export async function fetchRegistrationOptions(): Promise<{ data: RegistrationOp
   return { data: (data as RegistrationOptions | null) ?? null, error: error ? friendlyError(error.message) : null };
 }
 
-// Only the name, designation, and default location are sent. The database
-// decides the role from the designation and ignores anything else.
-export async function registerAccount(input: { email: string; password: string; displayName: string; designationId: string; locationId: string }): Promise<Result & { needsConfirmation?: boolean }> {
+export type Gender = 'female' | 'male' | 'other' | 'prefer_not_to_say';
+
+export const GENDER_LABELS: Record<Gender, string> = {
+  female: 'Female',
+  male: 'Male',
+  other: 'Other',
+  prefer_not_to_say: 'Prefer not to say',
+};
+
+// Name, Member type, Specific Location, ID No., and Gender are sent, plus
+// the email and password the account itself needs. The database decides
+// the role from the Member type (designation) and ignores anything else.
+export async function registerAccount(input: {
+  email: string;
+  password: string;
+  displayName: string;
+  designationId: string;
+  locationId: string;
+  idNumber: string;
+  gender: Gender;
+}): Promise<Result & { needsConfirmation?: boolean }> {
   const { data, error } = await supabase.auth.signUp({
     email: input.email.trim(),
     password: input.password,
-    options: { data: { display_name: input.displayName.trim(), designation_id: input.designationId, default_location_id: input.locationId } },
+    options: {
+      data: {
+        display_name: input.displayName.trim(),
+        designation_id: input.designationId,
+        default_location_id: input.locationId,
+        id_number: input.idNumber.trim(),
+        gender: input.gender,
+      },
+    },
   });
   return { ...toResult(error), needsConfirmation: !error && !data.session };
 }
@@ -345,6 +372,17 @@ export async function rejectRegistration(userId: string): Promise<Result> {
   return toResult(error);
 }
 
+// A Classroom Adviser (or any position with can_approve_own_location) only
+// sees the pending accounts at their own location — a School Admin or
+// System Admin already gets every pending account through the full People
+// panel's regular profiles query, so they don't need this.
+export type PendingNearby = { id: string; display_name: string | null; created_at: string; designation: string | null };
+
+export async function fetchPendingInMyLocation(): Promise<{ data: PendingNearby[]; error: string | null }> {
+  const { data, error } = await supabase.rpc('pending_in_my_location');
+  return { data: (data as PendingNearby[] | null) ?? [], error: error ? friendlyError(error.message) : null };
+}
+
 // --- Adding a person directly (School Admin, System Admin) ---
 //
 // Calls the admin-create-user Edge Function, which runs with the service
@@ -354,7 +392,7 @@ export async function rejectRegistration(userId: string): Promise<Result> {
 
 export type AddPersonResult = Result & { setupLink?: string | null; email?: string };
 
-export async function addPerson(input: { email: string; displayName: string; designationId: string }): Promise<AddPersonResult> {
+export async function addPerson(input: { email: string; displayName: string; designationId: string; locationId: string | null }): Promise<AddPersonResult> {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
   if (!token) return { error: 'Sign in again and try once more.' };
@@ -362,7 +400,7 @@ export async function addPerson(input: { email: string; displayName: string; des
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ email: input.email.trim(), display_name: input.displayName.trim(), designation_id: input.designationId }),
+      body: JSON.stringify({ email: input.email.trim(), display_name: input.displayName.trim(), designation_id: input.designationId, default_location_id: input.locationId }),
     });
     const body = await res.json().catch(() => ({}) as { error?: string; setupLink?: string | null; email?: string });
     if (!res.ok) return { error: friendlyError(body.error ?? 'Could not add this person.') };

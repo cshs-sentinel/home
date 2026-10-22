@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { addPerson, approveRegistration, rejectRegistration, setUserType, type SchoolData } from '../lib/data';
-import type { Profile, UserType } from '../lib/types';
+import { placeLabel } from '../lib/layout';
+import type { Location, Profile, UserType } from '../lib/types';
 import { roleDetails } from '../roles';
+import { PlacePicker } from './PlacePicker';
 import { timeAgo } from './QueuePanel';
 
 export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; data: SchoolData; onChanged: () => Promise<void> }) {
@@ -45,7 +47,7 @@ export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; da
 
   return (
     <div className="people">
-      <AddPersonForm assignable={assignable} isSystemAdmin={isSystemAdmin} onAdded={onChanged} />
+      <AddPersonForm assignable={assignable} isSystemAdmin={isSystemAdmin} locations={data.locations} onAdded={onChanged} />
 
       {pending.length > 0 && (
         <section>
@@ -149,11 +151,13 @@ export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; da
 // Creates an account directly, outside public sign-up — the only way a
 // School Admin or System Admin gets created. A School Admin's position
 // choices here are limited to Community Member positions by `assignable`.
-function AddPersonForm({ assignable, isSystemAdmin, onAdded }: { assignable: UserType[]; isSystemAdmin: boolean; onAdded: () => Promise<void> }) {
+function AddPersonForm({ assignable, isSystemAdmin, locations, onAdded }: { assignable: UserType[]; isSystemAdmin: boolean; locations: Location[]; onAdded: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [designationId, setDesignationId] = useState('');
+  const [locationId, setLocationId] = useState<string | null>(null);
+  const [pickingPlace, setPickingPlace] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ email: string; setupLink: string | null } | null>(null);
@@ -166,7 +170,7 @@ function AddPersonForm({ assignable, isSystemAdmin, onAdded }: { assignable: Use
     setSubmitting(true);
     setError('');
     setResult(null);
-    const r = await addPerson({ email, displayName, designationId });
+    const r = await addPerson({ email, displayName, designationId, locationId });
     setSubmitting(false);
     if (r.error) {
       setError(r.error);
@@ -176,6 +180,7 @@ function AddPersonForm({ assignable, isSystemAdmin, onAdded }: { assignable: Use
     setEmail('');
     setDisplayName('');
     setDesignationId('');
+    setLocationId(null);
     await onAdded();
   }
 
@@ -218,6 +223,36 @@ function AddPersonForm({ assignable, isSystemAdmin, onAdded }: { assignable: Use
                 ))}
               </select>
             </label>
+            <div className="field">
+              <span>Default location (optional)</span>
+              {locationId && !pickingPlace ? (
+                <p className="place-summary">
+                  📍 {placeLabel(locationId, locations)}{' '}
+                  <button type="button" className="action-small" onClick={() => setPickingPlace(true)}>
+                    Change
+                  </button>
+                  <button type="button" className="action-small" onClick={() => setLocationId(null)}>
+                    Clear
+                  </button>
+                </p>
+              ) : pickingPlace ? (
+                <PlacePicker
+                  locations={locations}
+                  initial={locationId}
+                  actionLabel="Use this place"
+                  skipLabel="Cancel"
+                  onPick={(id) => {
+                    setLocationId(id);
+                    setPickingPlace(false);
+                  }}
+                  onSkip={() => setPickingPlace(false)}
+                />
+              ) : (
+                <button type="button" className="action-small" onClick={() => setPickingPlace(true)}>
+                  Choose a place
+                </button>
+              )}
+            </div>
             {error && <p className="error-text">{error}</p>}
             <div className="queue-actions">
               <button type="submit" className="action-small primary" disabled={submitting}>

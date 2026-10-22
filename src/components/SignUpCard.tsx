@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchRegistrationOptions, registerAccount, type RegistrationOptions } from '../lib/data';
+import { fetchRegistrationOptions, registerAccount, GENDER_LABELS, type Gender, type RegistrationOptions } from '../lib/data';
 import { placeLabel } from '../lib/layout';
 import type { Location } from '../lib/types';
 import { PlacePicker } from './PlacePicker';
 
-// Public registration is for Community Members only. The form sends a
-// position and a default location; the database decides the role from the
-// position and refuses anything that is not open for sign-up.
+// Public registration is for Community Members only, and asks for exactly
+// five things beyond the sign-in credentials: Name, Member type, Specific
+// Location, ID No., and Gender. The database decides the role from the
+// Member type (the designation) and refuses anything that is not open for
+// sign-up.
 export function SignUpCard({ onLogin }: { onLogin: () => void }) {
   const [options, setOptions] = useState<RegistrationOptions | null>(null);
   const [loadError, setLoadError] = useState('');
@@ -15,6 +17,8 @@ export function SignUpCard({ onLogin }: { onLogin: () => void }) {
   const [password, setPassword] = useState('');
   const [designationId, setDesignationId] = useState('');
   const [locationId, setLocationId] = useState<string | null>(null);
+  const [idNumber, setIdNumber] = useState('');
+  const [gender, setGender] = useState<Gender | ''>('');
   const [pickingPlace, setPickingPlace] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -34,10 +38,10 @@ export function SignUpCard({ onLogin }: { onLogin: () => void }) {
   );
 
   async function submit() {
-    if (!locationId) return;
+    if (!locationId || !gender) return;
     setSubmitting(true);
     setError('');
-    const r = await registerAccount({ email, password, displayName: name, designationId, locationId });
+    const r = await registerAccount({ email, password, displayName: name, designationId, locationId, idNumber, gender });
     setSubmitting(false);
     if (r.error) setError(r.error);
     else if (r.needsConfirmation) setConfirmEmail(true);
@@ -73,7 +77,7 @@ export function SignUpCard({ onLogin }: { onLogin: () => void }) {
           }}
         >
           <label>
-            Full name
+            Name
             <input required minLength={2} maxLength={120} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
           </label>
           <label>
@@ -85,9 +89,9 @@ export function SignUpCard({ onLogin }: { onLogin: () => void }) {
             <input type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
           <label>
-            I am a
+            Member type
             <select className="role-select" required value={designationId} onChange={(e) => setDesignationId(e.target.value)}>
-              <option value="">Choose your position</option>
+              <option value="">Choose your member type</option>
               {options.designations.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -95,8 +99,23 @@ export function SignUpCard({ onLogin }: { onLogin: () => void }) {
               ))}
             </select>
           </label>
+          <label>
+            ID No.
+            <input required minLength={1} maxLength={40} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} placeholder="Student or employee ID" />
+          </label>
+          <label>
+            Gender
+            <select className="role-select" required value={gender} onChange={(e) => setGender(e.target.value as Gender)}>
+              <option value="">Choose your gender</option>
+              {(Object.keys(GENDER_LABELS) as Gender[]).map((g) => (
+                <option key={g} value={g}>
+                  {GENDER_LABELS[g]}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="field">
-            <span>Default location on campus</span>
+            <span>Specific location</span>
             {locationId && !pickingPlace ? (
               <p className="place-summary">
                 📍 {placeLabel(locationId, places)}{' '}
@@ -120,7 +139,7 @@ export function SignUpCard({ onLogin }: { onLogin: () => void }) {
             <small className="fine-print">Where you usually are, for example your homeroom or office. Reports start from here and you can change it later.</small>
           </div>
           {error && <p className="error-text">{error}</p>}
-          <button type="submit" disabled={submitting || !locationId || !designationId}>
+          <button type="submit" disabled={submitting || !locationId || !designationId || !gender}>
             {submitting ? 'Creating…' : 'Create account'}
           </button>
         </form>

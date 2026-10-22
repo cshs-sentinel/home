@@ -1,7 +1,7 @@
 # SENTINEL roles and permissions
 
 This reflects the row-level security policies and functions actually enforced by the connected
-Supabase project (`cshs-sentinel's Project`), as changed by migrations `0010` through `0014`.
+Supabase project (`cshs-sentinel's Project`), as changed by migrations `0010` through `0017`.
 
 ## Two layers
 
@@ -47,33 +47,51 @@ pending Community Member sign-ups. Does not see reports, incidents, or wellbeing
 An ICT Coordinator position can be mapped to System Admin only when the System Admin explicitly
 authorizes it (`authorized_privileged`). The last active System Admin cannot be moved away.
 
+### Classroom Adviser
+
+Not a fourth role — a built-in **Community Member** position (`can_approve_own_location`). It
+differs from any other Community Member account in exactly one way: it can approve or decline a
+pending Community Member registration, but only when that person's chosen Specific Location is
+the same as the adviser's own default location (never school-wide, and never anything else a
+School Admin or System Admin can do). A System Admin can grant the same ability to any other
+Community Member position from Setup › Positions. See `pending_in_my_location()`,
+`approve_registration()`, `reject_registration()`.
+
 ## Registration
 
-- Public sign-up shows only positions that are **active**, **mapped to Community Member**, and
-  **marked open for sign-up**. School Admin and System Admin positions cannot be opened for
-  sign-up (a database check enforces this).
-- The person must also pick a **default campus location**. It must be an active, non-restricted
-  place in the same school as the position.
-- The role is decided by the database trigger `handle_new_user()` from the position. A role (or
+Public sign-up asks for exactly five things beyond the sign-in credentials: **Name**, **Member
+type** (the designation), **Specific Location**, **ID No.**, and **Gender**. It is open: every
+active Community Member position is selectable at sign-up by default (a System Admin can still
+close any one of them in Setup › Positions).
+
+- Only positions that are **active**, **mapped to Community Member**, and **marked open for
+  sign-up** are offered. School Admin and System Admin positions can never be opened for sign-up
+  (a database check enforces this).
+- The person must also pick a **Specific Location**: an active, non-restricted place in the same
+  school as the position. It becomes their default location (`profiles.primary_location_id`).
+- **ID No.** (`profiles.id_number`, 1–40 characters) and **Gender** (`profiles.gender`: female,
+  male, other, or prefer not to say) are required on this path only — not for an admin-provisioned
+  account (Add Person, the seed script).
+- The role is decided by the database trigger `handle_new_user()` from the Member type. A role (or
   any other field) sent by the browser is ignored. Sign-ups without registration details are
-  refused unless an administrator created the account through the service key
-  (`app_metadata.provisioned = 'admin'`).
+  refused unless an administrator created the account through the service key.
 - Admins are created only by a System Admin, never through sign-up and never by a School Admin:
   School Admin and System Admin accounts are both added from People › Add person or assigned
   there, and only when the person adding or re-assigning them is a System Admin.
-- Public sign-up starts **closed**. A System Admin opens it per position in Setup › Positions
-  (“Open for public sign-up”).
 - **Every self-registered Community Member starts `pending`** (`profiles.status`) and cannot send
-  a report, incident, or check-in until a School Admin or System Admin approves them from
-  People › Waiting for approval (`approve_registration()` / `reject_registration()`). A declined
-  account is marked `rejected` and deactivated. Accounts added directly through People › Add
-  person are approved immediately, since an admin already vetted them.
+  a report, incident, or check-in until a School Admin, System Admin, or a Classroom Adviser for
+  their own location approves them from People › Waiting for approval (`approve_registration()` /
+  `reject_registration()`). A declined account is marked `rejected` and deactivated. Accounts
+  added directly through People › Add person are approved immediately, since an admin already
+  vetted them.
 
 ## Adding people directly
 
 School Admin and System Admin both have **People › Add person**, the only way an admin account is
-created (public sign-up never offers School Admin or System Admin positions). It calls the
-`admin-create-user` Edge Function, which:
+created (public sign-up never offers School Admin or System Admin positions). A default location
+is optional there — the trigger silently drops it if it is not an active, non-restricted place in
+the right school, rather than refusing the whole account. It calls the `admin-create-user` Edge
+Function, which:
 
 - Checks the caller's role and school itself (never trusts the browser): a School Admin may only
   choose a Community Member position; only a System Admin may choose a School Admin or System
@@ -112,7 +130,7 @@ happened is stored separately and is never overwritten by the default.
 | Only System Admins assign or change School Admin or System Admin positions | `admin_set_user_type()` |
 | Only System Admins add a School Admin or System Admin account | `admin-create-user` Edge Function |
 | A self-registered account cannot report, raise an incident, or check in until approved | `profiles.status`, `check_ins_insert_own`, `incidents_insert_own`, `submissions_insert_own` |
-| Only a School Admin or System Admin approves or declines a pending registration, in their own school | `approve_registration()`, `reject_registration()` |
+| A School Admin, System Admin, or Classroom Adviser (own location only) approves or declines a pending registration, in their own school | `approve_registration()`, `reject_registration()`, `pending_in_my_location()` |
 | School isolation | Every policy and function is scoped by `my_school_id()` |
 | Sign-up is validated by the database | `handle_new_user()` |
 

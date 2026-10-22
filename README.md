@@ -32,9 +32,12 @@ responders), and **System Admin**. A System Admin creates positions such as Teac
 ICT Coordinator and maps each one to a role. See
 [docs/roles-and-permissions.md](docs/roles-and-permissions.md).
 
-- Public sign-up creates Community Members only, with a required default campus location. It
-  starts closed: a System Admin opens it per position in Setup › Positions.
-- Admins are created by other admins (People tab) or by the System Admin.
+- Public sign-up creates Community Members only, asking for Name, Member type, Specific Location,
+  ID No., and Gender. Every active Community Member position is open by default; a System Admin
+  can close any of them in Setup › Positions. A self-registered account is `pending` until a
+  School Admin, System Admin, or Classroom Adviser (for their own location) approves it.
+- Admins (School Admin and System Admin) are created only by a System Admin, from People › Add
+  person — never by a School Admin and never through sign-up.
 
 There is one demo account for each role. From the login card on the homepage, open "Try a demo
 account for each role" to sign in with one click, or sign in manually with the password

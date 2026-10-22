@@ -453,6 +453,7 @@ function UserTypesSetup({ profile, userTypes, people, onChanged }: { profile: Pr
                 {t.name}
                 {t.is_system && <span className="chip chip-inline">built-in</span>}
                 {t.selectable_at_signup && <span className="chip chip-inline">sign-up</span>}
+                {t.can_approve_own_location && <span className="chip chip-inline">approves own location</span>}
                 {!t.is_active && <span className="chip chip-inline">off</span>}
               </strong>
               <small>
@@ -486,11 +487,15 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
   const allowed = new Set<string>(allowedFeatures(baseRole));
   const [signup, setSignup] = useState(type?.selectable_at_signup ?? false);
   const [authorized, setAuthorized] = useState(type?.authorized_privileged ?? false);
+  const [canApprove, setCanApprove] = useState(type?.can_approve_own_location ?? false);
   const roleChanged = Boolean(type) && baseRole !== type?.base_role;
 
   function changeRole(role: Role) {
     setBaseRole(role);
-    if (role !== 'community') setSignup(false);
+    if (role !== 'community') {
+      setSignup(false);
+      setCanApprove(false);
+    }
     if (role !== 'system_admin') setAuthorized(false);
     const ceiling = new Set<string>(allowedFeatures(role));
     setChosen(type ? new Set([...chosen].filter((f) => ceiling.has(f))) : new Set(defaultFeatures(role)));
@@ -508,7 +513,7 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
   async function save() {
     setSaving(true);
     setError('');
-    const r = await saveUserType(profile, { id: type?.id, name, description, baseRole, features: [...chosen].filter((f) => allowed.has(f)), isActive: active, selectableAtSignup: signup, authorizedPrivileged: authorized });
+    const r = await saveUserType(profile, { id: type?.id, name, description, baseRole, features: [...chosen].filter((f) => allowed.has(f)), isActive: active, selectableAtSignup: signup, authorizedPrivileged: authorized, canApproveOwnLocation: canApprove });
     setSaving(false);
     if (r.error) setError(r.error);
     else onDone(true);
@@ -544,9 +549,14 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
         </label>
       )}
       {baseRole === 'community' && (
-        <label className="check-row">
-          <input type="checkbox" checked={signup} onChange={(e) => setSignup(e.target.checked)} /> Open for public sign-up
-        </label>
+        <>
+          <label className="check-row">
+            <input type="checkbox" checked={signup} onChange={(e) => setSignup(e.target.checked)} /> Open for public sign-up
+          </label>
+          <label className="check-row">
+            <input type="checkbox" checked={canApprove} onChange={(e) => setCanApprove(e.target.checked)} /> Can approve Community Member sign-ups at their own default location
+          </label>
+        </>
       )}
       <label className="field">
         Description (optional)

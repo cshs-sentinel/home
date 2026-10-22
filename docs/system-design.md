@@ -155,12 +155,18 @@ Enforcement:
 
 - Public sign-up (`src/components/SignUpCard.tsx`) lists positions from
   `registration_options()`: active, mapped to Community Member, and marked **Open for public
-  sign-up** in Setup › Positions. It starts closed until a System Admin opens a position.
-- The person also picks a **default campus location** with the same cascading dropdowns used
-  in reports. It must be active, not restricted, and in the position's school.
-- The form sends only name, position, and default location. `handle_new_user()` assigns the
-  role from the position and ignores anything else, including a submitted role. School Admin
-  and System Admin positions cannot be opened for sign-up. Admins are created by other admins.
+  sign-up** in Setup › Positions — every active Community Member position is open by default
+  (migration `0015`); a System Admin can still close any one of them.
+- The person also picks a **Specific Location** with the same cascading dropdowns used in
+  reports. It must be active, not restricted, and in the position's school.
+- The form sends Name, Member type (the position), Specific Location, ID No., and Gender.
+  `handle_new_user()` assigns the role from the Member type and ignores anything else, including
+  a submitted role; it also requires ID No. (1–40 characters) and Gender, and stores them on
+  `profiles.id_number` / `profiles.gender`. School Admin and System Admin positions cannot be
+  opened for sign-up. Admins (School Admin, System Admin) are created only by a System Admin.
+  The new account starts `pending` and cannot report, raise an incident, or check in until a
+  School Admin, System Admin, or Classroom Adviser (for their own location) approves it — see
+  [roles-and-permissions.md](roles-and-permissions.md).
 - The default location (`profiles.primary_location_id`) pre-fills the place step in reports and
   check-ins. Each report stores the place the person actually chooses, separately. It can be
   changed from the Report tab, and if the saved place becomes inactive the app asks for a new one.
@@ -470,10 +476,11 @@ demo activity live.
 10. **Features are not enforced by the database.** Turning a feature off hides it in the app, but
     the role still allows the action through the API. Enforcing report features in the insert
     policies would close this.
-11. **Sign-up needs an email setting check.** Public sign-up is built and the database enforces
-    it, but it starts closed (no position is open) and the Supabase auth `site_url` still needs
-    to point at the live app before confirmation emails work. A person who registers is placed in
-    the school of the position they choose; there is one school today.
+11. **Sign-up needs an email setting check.** Public sign-up is live (open by default since
+    migration `0015`) and the database enforces it, but the Supabase auth `site_url` still needs
+    to point at the live app before confirmation emails — and an Add Person password-setup
+    link — work right. A person who registers is placed in the school of the position they
+    choose; there is one school today.
 12. **Credentials.** `.env` values appeared in a working session's logs. Rotate the Supabase
     management token, service role key, database password, Cloudflare token, and the GitHub token
     that was shared in chat.

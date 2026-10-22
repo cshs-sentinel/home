@@ -24,6 +24,7 @@ export type UserType = {
   is_system: boolean;
   selectable_at_signup: boolean;
   authorized_privileged: boolean;
+  can_approve_own_location: boolean;
 };
 
 export type Environment = 'indoor' | 'outdoor' | 'covered';
