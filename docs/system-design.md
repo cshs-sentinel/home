@@ -359,8 +359,10 @@ demo activity live.
    always true. It should compare to `report_attachments.school_id`.
 7. **Reporters cannot see past submissions.** No RLS policy lets a sender read their own
    feelings or reports. The app shows only their incidents and check-ins.
-8. **Demo data is synthetic.** The demo school's analytics come from
-   `seed-demo-activity.mjs`. Remove it with `--clean` before using real data.
+8. **Demo accounts share the real school.** The demo campus, demo activity, and original sample
+   rows were deleted on 2026-10-22. The 8 demo accounts still sign in to the same school as the
+   real Cabiao SHS setup, so anything they report lands in real analytics. A separate test
+   school would keep them apart.
 9. **No automated tests**, no password reset, and no self-service sign-up.
 10. **Features are not enforced by the database.** Turning a feature off hides it in the app, but
     the base role still allows the action through the API. Enforcing report features in the

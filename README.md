@@ -47,8 +47,10 @@ users. It reads `demo-accounts.json` (in `src/`) and requires `SUPABASE_SERVICE_
 
 ## Demo activity for the analytics
 
-The demo school has 14 days of synthetic feelings, reports, incidents, and check-ins so the
-insights and charts have something to show. Every row is tagged `[demo]`.
+The demo campus and its synthetic activity were removed on 2026-10-22; the school now holds only
+real setup (Cabiao SHS). The script below can add 14 days of synthetic feelings, reports,
+incidents, and check-ins, tagged `[demo]`, onto whatever places exist. Only use it on a test
+school, because it mixes synthetic rows into real analytics.
 
 ```bash
 node scripts/seed-demo-activity.mjs
