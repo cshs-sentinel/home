@@ -22,10 +22,10 @@ export type Range = (typeof RANGES)[number];
 
 export function RangeFilter({ days, onDays }: { days: Range; onDays: (d: Range) => void }) {
   return (
-    <div className="filter-row" role="group" aria-label="Time range">
+    <div className="segmented" role="group" aria-label="Time range">
       {RANGES.map((r) => (
         <button type="button" key={r} className={`filter-button${days === r ? ' is-active' : ''}`} aria-pressed={days === r} onClick={() => onDays(r)}>
-          Last {r} days
+          {r} days
         </button>
       ))}
     </div>
@@ -45,7 +45,7 @@ type Props = {
 
 export function AnalyticsPanel({ role, days, onDays, data, weather, quakes, weatherError, onDraftAlert }: Props) {
   const insights = useMemo(
-    () => generateInsights({ role, weather, quakes, submissions: data.submissions, incidents: data.incidents, checkIns: data.checkIns, locations: data.locations }),
+    () => generateInsights({ role, weather, quakes, submissions: data.submissions, incidents: data.incidents, checkIns: data.checkIns, locations: data.placeNames }),
     [role, weather, quakes, data],
   );
 

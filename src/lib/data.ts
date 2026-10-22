@@ -11,6 +11,7 @@ const MANAGES_PEOPLE: Role[] = ['school_admin', 'system_admin'];
 
 export type SchoolData = {
   locations: Location[];
+  placeNames: { id: string; name: string }[];
   submissions: Submission[];
   incidents: Incident[];
   checkIns: CheckIn[];
@@ -21,7 +22,7 @@ export type SchoolData = {
   counts: Record<string, number | string> | null;
 };
 
-const EMPTY: SchoolData = { locations: [], submissions: [], incidents: [], checkIns: [], alerts: [], people: [], userTypes: [], audit: [], counts: null };
+const EMPTY: SchoolData = { locations: [], placeNames: [], submissions: [], incidents: [], checkIns: [], alerts: [], people: [], userTypes: [], audit: [], counts: null };
 
 export function useSchoolData(profile: Profile) {
   const [data, setData] = useState<SchoolData>(EMPTY);
@@ -77,7 +78,9 @@ export function useSchoolData(profile: Profile) {
     const firstError = [locations, submissions, incidents, checkIns, alerts, people, userTypes, audit, counts].find((r) => r.error)?.error;
     if (firstError) setError(firstError.message);
 
+    const { data: names } = await supabase.from('locations').select('id, name').limit(5000);
     setData({
+      placeNames: (names ?? []) as { id: string; name: string }[],
       locations: (locations.data ?? []) as Location[],
       submissions: (submissions.data ?? []) as Submission[],
       incidents: (incidents.data ?? []) as Incident[],

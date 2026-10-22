@@ -101,12 +101,12 @@ export function incidentSummary(incidents: Incident[], now = Date.now()) {
   return { open: open.length, unacknowledged: unacknowledged.length, overdue, medianAckMinutes: median };
 }
 
-export function locationName(locations: Location[], id: string | null): string {
+export function locationName(locations: { id: string; name: string }[], id: string | null): string {
   if (!id) return 'No location given';
   return locations.find((l) => l.id === id)?.name ?? 'Unknown location';
 }
 
-export function hotspots(rows: { location_id: string | null }[], locations: Location[]): Count[] {
+export function hotspots(rows: { location_id: string | null }[], locations: { id: string; name: string }[]): Count[] {
   return countBy(rows, (r) => r.location_id, (id) => locationName(locations, id));
 }
 
@@ -131,7 +131,7 @@ type InsightInput = {
   submissions: Submission[];
   incidents: Incident[];
   checkIns: CheckIn[];
-  locations: Location[];
+  locations: { id: string; name: string }[];
   now?: number;
 };
 

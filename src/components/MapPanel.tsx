@@ -152,6 +152,8 @@ export function MapPanel({ role, days, onDays, data }: Props) {
     const t = Math.min(1, Math.max(0, (value - scaleMin) / (scaleMax - scaleMin)));
     return `color-mix(in srgb, var(--viz-series) ${Math.round(14 + 76 * t)}%, var(--surface))`;
   };
+  const shadedStats = [...(view === 'campus' ? leafStats : blockStats).values()];
+  const shaded = isStress ? shadedStats.some((st) => st.value !== null) : shadedStats.some((st) => (st.value ?? 0) > 0);
   const format = (s: Stats) => (s.suppressed ? 'too few' : s.value === null ? '—' : isStress ? s.value.toFixed(1) : String(s.value));
   const unit = UNITS[layer];
   const directHere = items.filter((i) => i.locationId === currentId);
@@ -167,7 +169,17 @@ export function MapPanel({ role, days, onDays, data }: Props) {
 
   return (
     <div className="map-panel">
-      <RangeFilter days={days} onDays={onDays} />
+      <div className="map-toolbar">
+        <RangeFilter days={days} onDays={onDays} />
+        <div className="segmented" role="group" aria-label="Map view">
+          <button type="button" className={`filter-button${view === 'campus' ? ' is-active' : ''}`} aria-pressed={view === 'campus'} onClick={() => { setView('campus'); setSelected(null); }}>
+            Whole campus
+          </button>
+          <button type="button" className={`filter-button${view === 'level' ? ' is-active' : ''}`} aria-pressed={view === 'level'} onClick={() => { setView('level'); setSelected(null); }}>
+            One level
+          </button>
+        </div>
+      </div>
 
       <section className="chart-card map-card">
         <header>
@@ -179,18 +191,17 @@ export function MapPanel({ role, days, onDays, data }: Props) {
           </p>
         </header>
 
-        <div className="filter-row view-toggle" role="group" aria-label="Map view">
-          <button type="button" className={`filter-button${view === 'campus' ? ' is-active' : ''}`} aria-pressed={view === 'campus'} onClick={() => { setView('campus'); setSelected(null); }}>
-            Whole campus
-          </button>
-          <button type="button" className={`filter-button${view === 'level' ? ' is-active' : ''}`} aria-pressed={view === 'level'} onClick={() => { setView('level'); setSelected(null); }}>
-            One level
-          </button>
-        </div>
 
         <div className="map-controls" role="group" aria-label="Heatmap type">
           <span className="control-label">Heatmap</span>
-          <div className="chip-row">
+          <select className="role-select layer-select" value={layer} onChange={(e) => chooseLayer(e.target.value as Layer)} aria-label="Heatmap type">
+            {layers.map((l) => (
+              <option key={l.key} value={l.key}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          <div className="chip-row layer-chips">
             {layers.map((l) => (
               <button type="button" key={l.key} className={`filter-button${layer === l.key ? ' is-active' : ''}`} aria-pressed={layer === l.key} onClick={() => chooseLayer(l.key)}>
                 {l.label}
@@ -297,11 +308,13 @@ export function MapPanel({ role, days, onDays, data }: Props) {
           </>
         )}
 
+        {shaded && (
         <div className="map-legend" aria-hidden="true">
           <span>{isStress ? '1 low' : '0'}</span>
           <span className="legend-bar" />
           <span>{isStress ? '5 high' : `${scaleMax} ${unit}`}</span>
         </div>
+        )}
 
         {selectedLoc && selectedStats && (
           <div className="map-detail">
