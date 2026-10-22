@@ -67,6 +67,7 @@ flowchart LR
 | Setup | `src/components/SetupPanel.tsx` | Locations tree, map layout, location types, user types |
 | Layout editor | `src/components/LayoutEditor.tsx` | Drag-and-drop grid editor for the campus map |
 | Campus map | `src/components/CampusMap.tsx` | Heatmap of the campus, drill-down, and per-place details |
+| Overview map | `src/components/NestedMap.tsx` | Whole campus in one nested picture, auto-tiling undrawn places |
 | Reporting | `src/components/ReportPanel.tsx` | Button-only flows: help, safe, feelings, hazard, incident, suggestion |
 | Place picker | `src/components/PlacePicker.tsx` | Cascading dropdowns from campus down to room |
 | Insights | `src/components/InsightsPanel.tsx` | Decision cards, KPIs, and charts per role |
@@ -189,6 +190,20 @@ The editor is drag and drop only:
 - **Open ›** on a block edits the map inside it (campus → building → floor → rooms).
 
 It uses pointer events, so it works with a mouse or a finger.
+
+### Whole campus overview
+
+Both maps have a **Whole campus** view (`NestedMap`) next to the one-level view. It draws the
+entire tree in one picture: buildings contain their floors, floors contain their rooms, each at
+the position the admin placed it. When a place's children are not drawn on its grid yet, they are
+tiled automatically (treemap-style), so every place appears. A small "+N" badge marks places
+that exist but are not drawn on a map that has other places drawn.
+
+- In Setup › Map layout, tapping any block opens that level in the editor (a room opens its
+  floor).
+- In Insights › Campus map, Whole campus is the default view. Rooms and other leaf places are
+  shaded by the selected layer, so hotspots across all buildings show at once. Tapping a block
+  shows its full path and latest items, and the table lists every place by full path.
 
 ### Campus map and heatmap
 

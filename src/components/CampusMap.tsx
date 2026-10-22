@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { iconFor, labelFor } from '../lib/catalog';
-import { blockOf, blockStyle, childrenIndex, pathTo, subtreeIds } from '../lib/layout';
+import { blockOf, blockStyle, childrenIndex, pathTo, placeLabel, subtreeIds } from '../lib/layout';
+import { NestedMap } from './NestedMap';
 import { since } from '../lib/analytics';
 import type { CheckIn, Incident, Location, Submission } from '../lib/types';
 import type { Role } from '../roles';
@@ -30,9 +31,11 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
   const [layer, setLayer] = useState<Layer>('reports');
   const index = useMemo(() => childrenIndex(locations), [locations]);
   const startId = useMemo(() => {
-    const withMap = locations.find((l) => (index.get(l.id) ?? []).some((k) => blockOf(k)) && !l.parent_id);
-    return withMap?.id ?? locations.find((l) => (index.get(l.id) ?? []).some((k) => blockOf(k)))?.id ?? null;
-  }, [locations, index]);
+    const roots0 = index.get(null) ?? [];
+    const pick = roots0.find((r) => (index.get(r.id) ?? []).some((k) => blockOf(k))) ?? roots0.find((r) => (index.get(r.id) ?? []).length) ?? roots0[0];
+    return pick?.id ?? null;
+  }, [index]);
+  const [view, setView] = useState<'campus' | 'level'>('campus');
   const [parentId, setParentId] = useState<string | null>(startId);
   const [selected, setSelected] = useState<string | null>(null);
   const currentId = parentId ?? startId;
@@ -61,7 +64,7 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
       <section className="chart-card map-card">
         <header>
           <h3>Campus map</h3>
-          <p>No map yet. A System Admin can draw one in Setup › Map layout.</p>
+          <p>No places yet. A System Admin can add them in Setup › Locations.</p>
         </header>
       </section>
     );
@@ -81,7 +84,11 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
   };
 
   const blockStats = new Map(kids.map((k) => [k.id, statsFor(k.id)]));
-  const counts = [...blockStats.values()].map((s) => s.value ?? 0);
+  const path = pathTo(currentId, locations);
+  const campusId = path[0]?.id ?? currentId;
+  const campusPlaces = [...subtreeIds(campusId, index)].filter((id) => id !== campusId);
+  const leafStats = new Map(campusPlaces.filter((id) => !(index.get(id) ?? []).length).map((id) => [id, statsFor(id)]));
+  const counts = (view === 'campus' ? [...leafStats.values()] : [...blockStats.values()]).map((s) => s.value ?? 0);
   const scaleMin = layer === 'stress' ? 1 : 0;
   const scaleMax = layer === 'stress' ? 5 : Math.max(1, ...counts);
   const shade = (value: number | null) => {
@@ -93,9 +100,8 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
   const unit = layer === 'stress' ? 'average stress' : layer === 'help' ? 'help requests' : 'reports';
   const directHere = items.filter((i) => i.locationId === currentId);
 
-  const selectedLoc = selected ? kids.find((k) => k.id === selected) : null;
-  const selectedStats = selectedLoc ? blockStats.get(selectedLoc.id)! : null;
-  const path = pathTo(currentId, locations);
+  const selectedLoc = selected ? locations.find((l) => l.id === selected) ?? null : null;
+  const selectedStats = selectedLoc ? statsFor(selectedLoc.id) : null;
   const roots = (index.get(null) ?? []).filter((r) => (index.get(r.id) ?? []).length > 0);
 
   return (
@@ -103,7 +109,9 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
       <header>
         <h3>Campus map</h3>
         <p>
-          Shaded by {unit} in the last {days} days, counting everything inside each place. Tap a block for details.
+          {view === 'campus'
+            ? `Every building, floor, and room at once. Rooms and other places are shaded by ${unit} in the last ${days} days. Tap any block for details.`
+            : `Shaded by ${unit} in the last ${days} days, counting everything inside each place. Tap a block for details.`}
         </p>
       </header>
 
@@ -115,6 +123,40 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
         ))}
       </div>
 
+      <div className="filter-row view-toggle" role="group" aria-label="Map view">
+        <button type="button" className={`filter-button${view === 'campus' ? ' is-active' : ''}`} aria-pressed={view === 'campus'} onClick={() => { setView('campus'); setSelected(null); }}>
+          Whole campus
+        </button>
+        <button type="button" className={`filter-button${view === 'level' ? ' is-active' : ''}`} aria-pressed={view === 'level'} onClick={() => { setView('level'); setSelected(null); }}>
+          One level
+        </button>
+      </div>
+
+      {view === 'campus' && roots.length > 1 && (
+        <nav className="crumbs" aria-label="Campus">
+          <select className="role-select" value={campusId} onChange={(e) => { setParentId(e.target.value); setSelected(null); }} aria-label="Campus">
+            {roots.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </nav>
+      )}
+
+      {view === 'campus' && (
+        <NestedMap
+          locations={locations}
+          rootId={campusId}
+          selectedId={selected}
+          onPick={(id) => setSelected(selected === id ? null : id)}
+          shade={(id) => (leafStats.has(id) ? shade(leafStats.get(id)!.value) : undefined)}
+          value={(id) => (leafStats.has(id) ? format(leafStats.get(id)!.value) : null)}
+        />
+      )}
+
+      {view === 'level' && (
+      <>
       <nav className="crumbs" aria-label="Map level">
         {roots.length > 1 && path[0] ? (
           <select className="role-select" value={path[0].id} onChange={(e) => { setParentId(e.target.value); setSelected(null); }} aria-label="Campus">
@@ -147,7 +189,7 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
       </nav>
 
       {placed.length === 0 ? (
-        <p className="empty-note">Nothing inside {current.name} is on the map yet.</p>
+        <p className="empty-note">Nothing inside {current.name} is drawn on its map yet. Try Whole campus.</p>
       ) : (
         <div className="map-canvas" style={{ aspectRatio: `${current.grid_cols} / ${current.grid_rows}`, width: `min(100%, calc(60vh * ${current.grid_cols} / ${current.grid_rows}))`, backgroundSize: `${100 / current.grid_cols}% ${100 / current.grid_rows}%` }}>
           {placed.map((k) => {
@@ -172,6 +214,9 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
         </div>
       )}
 
+      </>
+      )}
+
       <div className="map-legend" aria-hidden="true">
         <span>{layer === 'stress' ? '1 low' : '0'}</span>
         <span className="legend-bar" />
@@ -182,11 +227,11 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
         <div className="map-detail">
           <div className="map-detail-head">
             <strong>
-              {selectedLoc.name} · {format(selectedStats.value)} {unit}
+              {placeLabel(selectedLoc.id, locations)} · {format(selectedStats.value)} {unit}
               {layer === 'stress' && ` (${selectedStats.count} check-ins)`}
             </strong>
             {(index.get(selectedLoc.id) ?? []).some((c) => blockOf(c)) && (
-              <button type="button" className="action-small" onClick={() => { setParentId(selectedLoc.id); setSelected(null); }}>
+              <button type="button" className="action-small" onClick={() => { setParentId(selectedLoc.id); setView('level'); setSelected(null); }}>
                 Open map ›
               </button>
             )}
@@ -216,7 +261,7 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
         </div>
       )}
 
-      {(unplaced.length > 0 || directHere.length > 0) && (
+      {view === 'level' && (unplaced.length > 0 || directHere.length > 0) && (
         <div className="chip-row map-extra">
           {directHere.length > 0 && (
             <span className="chip">
@@ -242,13 +287,16 @@ export function CampusMap({ role, days, locations, submissions, incidents, check
             </tr>
           </thead>
           <tbody>
-            {kids.map((k) => (
-              <tr key={k.id}>
-                <td>{k.name}</td>
-                <td>{format(blockStats.get(k.id)!.value)}</td>
-                {layer === 'stress' && <td>{blockStats.get(k.id)!.count}</td>}
-              </tr>
-            ))}
+            {(view === 'campus' ? campusPlaces : kids.map((k) => k.id)).map((id) => {
+              const stats = view === 'campus' ? statsFor(id) : blockStats.get(id)!;
+              return (
+                <tr key={id}>
+                  <td>{view === 'campus' ? placeLabel(id, locations) : locations.find((l) => l.id === id)?.name}</td>
+                  <td>{format(stats.value)}</td>
+                  {layer === 'stress' && <td>{stats.count}</td>}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </details>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { placeBlock, setGridSize } from '../lib/data';
 import { blockOf, blockStyle, childrenIndex, clampBlock, overlaps, pathTo } from '../lib/layout';
+import { NestedMap } from './NestedMap';
 import type { Block, Location, SetupLocation } from '../lib/types';
 
 type Drag =
@@ -31,6 +32,7 @@ export function LayoutEditor({ locations, onPatch }: { locations: SetupLocation[
   const [preview, setPreview] = useState<Block | null>(null);
   const [outside, setOutside] = useState(false);
   const [status, setStatus] = useState('');
+  const [view, setView] = useState<'edit' | 'overview'>('edit');
 
   function cellAt(clientX: number, clientY: number) {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -140,6 +142,52 @@ export function LayoutEditor({ locations, onPatch }: { locations: SetupLocation[
 
   const path = pathTo(parentId, active);
   const dragging = drag ? active.find((l) => l.id === drag.id) : null;
+  const campusId = path[0]?.id ?? roots[0]?.id ?? null;
+
+  const viewToggle = (
+    <div className="filter-row view-toggle" role="group" aria-label="Map view">
+      <button type="button" className={`filter-button${view === 'edit' ? ' is-active' : ''}`} aria-pressed={view === 'edit'} onClick={() => setView('edit')}>
+        Edit one level
+      </button>
+      <button type="button" className={`filter-button${view === 'overview' ? ' is-active' : ''}`} aria-pressed={view === 'overview'} onClick={() => setView('overview')}>
+        Whole campus
+      </button>
+    </div>
+  );
+
+  if (view === 'overview' && campusId) {
+    return (
+      <section className="layout-editor">
+        <div className="setup-head">
+          <div>
+            <h2 className="section-title">Map layout</h2>
+            <p className="empty-note">The whole campus at once: buildings, floors, and rooms as you placed them. Places not drawn yet are tiled automatically. Tap any block to edit that level.</p>
+          </div>
+        </div>
+        {viewToggle}
+        {roots.length > 1 && (
+          <nav className="crumbs" aria-label="Campus">
+            <select className="role-select" value={campusId} onChange={(e) => setParentId(e.target.value)} aria-label="Campus">
+              {roots.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </nav>
+        )}
+        <NestedMap
+          locations={active}
+          rootId={campusId}
+          onPick={(id) => {
+            const hasKids = (index.get(id) ?? []).length > 0;
+            setParentId(hasKids ? id : active.find((l) => l.id === id)?.parent_id ?? campusId);
+            setView('edit');
+          }}
+        />
+      </section>
+    );
+  }
 
   return (
     <section className="layout-editor">
@@ -149,6 +197,7 @@ export function LayoutEditor({ locations, onPatch }: { locations: SetupLocation[
           <p className="empty-note">Drag places from the tray onto the grid. Drag a block to move it, drag its corner to resize, or drag it off the grid to remove it. Changes save on drop.</p>
         </div>
       </div>
+      {viewToggle}
 
       <nav className="crumbs" aria-label="Map level">
         <select className="role-select" value={roots.some((r) => r.id === path[0]?.id) ? path[0]?.id : ''} onChange={(e) => setParentId(e.target.value)} aria-label="Campus">
