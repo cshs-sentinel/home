@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase';
-import type { Alert, AuditEntry, CheckIn, Environment, Incident, Location, LocationType, Profile, SetupLocation, Submission, SubmissionKind, UserType } from './types';
+import type { Alert, AuditEntry, Block, CheckIn, Environment, Incident, Location, LocationType, Profile, SetupLocation, Submission, SubmissionKind, UserType } from './types';
 import { fetchEarthquakes, fetchWeather, schoolCoordinates, type Quake, type WeatherSnapshot } from './weather';
 import type { Role } from '../roles';
 
@@ -36,7 +36,7 @@ export function useSchoolData(profile: Profile) {
     const managesPeople = MANAGES_PEOPLE.includes(profile.role);
 
     const [locations, submissions, incidents, checkIns, alerts, people, userTypes, audit, counts] = await Promise.all([
-      supabase.from('locations').select('id, name, environment, parent_id').eq('status', 'active').order('name'),
+      supabase.from('locations').select('id, name, environment, parent_id, grid_cols, grid_rows, layout_x, layout_y, layout_w, layout_h').eq('status', 'active').order('name'),
       readsSubmissions
         ? supabase
             .from('submissions')
@@ -219,7 +219,7 @@ export type SetupData = { locations: SetupLocation[]; types: LocationType[]; use
 
 export async function loadSetup(): Promise<{ data: SetupData; error: string | null }> {
   const [locations, types, userTypes] = await Promise.all([
-    supabase.from('locations').select('id, name, environment, parent_id, category_id, code, status').order('name').limit(5000),
+    supabase.from('locations').select('id, name, environment, parent_id, category_id, code, status, grid_cols, grid_rows, layout_x, layout_y, layout_w, layout_h').order('name').limit(5000),
     supabase.from('location_categories').select('id, name, level, environment, is_active').order('level').order('name'),
     supabase.from('user_types').select('id, name, description, base_role, features, is_active, is_system').order('name'),
   ]);
@@ -269,5 +269,18 @@ export async function saveUserType(
   const { error } = input.id
     ? await supabase.from('user_types').update(row).eq('id', input.id)
     : await supabase.from('user_types').insert({ ...row, school_id: profile.school_id });
+  return toResult(error);
+}
+
+export async function placeBlock(locationId: string, block: Block | null): Promise<Result> {
+  const row = block
+    ? { layout_x: block.x, layout_y: block.y, layout_w: block.w, layout_h: block.h }
+    : { layout_x: null, layout_y: null, layout_w: null, layout_h: null };
+  const { error } = await supabase.from('locations').update(row).eq('id', locationId);
+  return toResult(error);
+}
+
+export async function setGridSize(locationId: string, cols: number, rows: number): Promise<Result> {
+  const { error } = await supabase.from('locations').update({ grid_cols: cols, grid_rows: rows }).eq('id', locationId);
   return toResult(error);
 }

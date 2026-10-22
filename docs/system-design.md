@@ -64,7 +64,9 @@ flowchart LR
 | App shell | `src/App.tsx` | Login, greeting, alert banner, menus built from the user type (bottom bar on phones) |
 | Role catalog | `src/roles.ts` | The 8 base roles and their labels |
 | Feature catalog | `src/lib/features.ts` | Features, the most each base role can have, defaults, and menu order |
-| Setup | `src/components/SetupPanel.tsx` | Locations tree, location types, user types |
+| Setup | `src/components/SetupPanel.tsx` | Locations tree, map layout, location types, user types |
+| Layout editor | `src/components/LayoutEditor.tsx` | Drag-and-drop grid editor for the campus map |
+| Campus map | `src/components/CampusMap.tsx` | Heatmap of the campus, drill-down, and per-place details |
 | Reporting | `src/components/ReportPanel.tsx` | Button-only flows: help, safe, feelings, hazard, incident, suggestion |
 | Insights | `src/components/InsightsPanel.tsx` | Decision cards, KPIs, and charts per role |
 | Queue | `src/components/QueuePanel.tsx` | Help requests, incident workflow, report review |
@@ -79,7 +81,7 @@ flowchart LR
 | Theme | `src/theme.ts` | Light, Dark, and Neon themes |
 | Demo accounts | `scripts/seed-sample-accounts.mjs` | One login per role |
 | Demo activity | `scripts/seed-demo-activity.mjs` | 14 days of synthetic, tagged activity; `--clean` removes it |
-| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types |
+| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types; `0004` adds map layout fields |
 
 ## 4. Data model
 
@@ -164,6 +166,39 @@ Rules, enforced by the database (`validate_location`):
 
 In the app the admin taps **+ Add campus**, then **+ Inside** on any place. The form only offers
 types that fit at that spot.
+
+### Map layout
+
+Each place can hold a grid (24 × 16 by default; 12 to 40 per side). The places inside it are
+drawn on that grid as blocks, stored as `layout_x`, `layout_y`, `layout_w`, `layout_h` on the
+child and `grid_cols`, `grid_rows` on the parent (migration `0004`).
+
+The editor is drag and drop only:
+
+- Drag a place from the tray onto the grid to add it.
+- Drag a block to move it, or drag its corner to resize it.
+- Drag a block off the grid to remove it from the map. The place itself is not archived.
+- Each drop saves immediately. Overlapping blocks get an orange outline.
+- **Open ›** on a block edits the map inside it (campus → building → floor → rooms).
+
+It uses pointer events, so it works with a mouse or a finger.
+
+### Campus map and heatmap
+
+Insights roles (Teacher, Security, DRRM, Guidance, School Admin) see a **Campus map** in Insights
+with the same layout. Each block is shaded by activity in the selected period, counting
+everything inside that place:
+
+| Layer | Who | Shading |
+| --- | --- | --- |
+| Reports and incidents | All insight roles (each sees only rows RLS allows) | Count |
+| Help requests | Security, DRRM, School Admin | Count of "I need help" check-ins |
+| Average stress | Guidance only | Average stress, 1–5 |
+
+Tapping a block lists its latest items with their status, and **Open map ›** drills in. Reports
+filed at the parent itself, and places not yet on the map, are listed under the grid so nothing
+is hidden. Every map has a table view. Shading uses one sequential color per theme, and labels
+sit on a surface chip so they stay readable at any intensity.
 
 ### Location types
 

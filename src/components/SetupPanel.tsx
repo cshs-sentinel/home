@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { loadSetup, saveLocation, saveLocationType, saveUserType, setLocationStatus, type SetupData } from '../lib/data';
 import { FEATURE_GROUPS, allowedFeatures, defaultFeatures, type Feature } from '../lib/features';
-import type { Environment, LocationType, Profile, SetupLocation, UserType } from '../lib/types';
+import type { Environment, Location, LocationType, Profile, SetupLocation, UserType } from '../lib/types';
+import { LayoutEditor } from './LayoutEditor';
 import { ROLE_ORDER, roleDetails, type Role } from '../roles';
 
 const LEVELS: Record<number, { label: string; icon: string }> = {
@@ -11,11 +12,11 @@ const LEVELS: Record<number, { label: string; icon: string }> = {
   4: { label: 'Room or area', icon: '🚪' },
 };
 
-type Section = 'locations' | 'types' | 'userTypes';
+type Section = 'locations' | 'layout' | 'types' | 'userTypes';
 
 export function SetupPanel({ profile, features, people, onPeopleChanged }: { profile: Profile; features: Set<Feature>; people: Profile[]; onPeopleChanged: () => Promise<void> }) {
   const sections: { key: Section; label: string }[] = [
-    ...(features.has('setup.locations') ? [{ key: 'locations' as const, label: 'Locations' }, { key: 'types' as const, label: 'Location types' }] : []),
+    ...(features.has('setup.locations') ? [{ key: 'locations' as const, label: 'Locations' }, { key: 'layout' as const, label: 'Map layout' }, { key: 'types' as const, label: 'Location types' }] : []),
     ...(features.has('setup.user_types') ? [{ key: 'userTypes' as const, label: 'User types' }] : []),
   ];
   const [section, setSection] = useState<Section>(sections[0]?.key ?? 'locations');
@@ -34,6 +35,10 @@ export function SetupPanel({ profile, features, people, onPeopleChanged }: { pro
     reload();
   }, [reload]);
 
+  function patchLocation(id: string, patch: Partial<Location>) {
+    setData((d) => ({ ...d, locations: d.locations.map((l) => (l.id === id ? { ...l, ...patch } : l)) }));
+  }
+
   return (
     <div className="setup">
       <div className="filter-row" role="tablist" aria-label="Setup sections">
@@ -49,6 +54,7 @@ export function SetupPanel({ profile, features, people, onPeopleChanged }: { pro
       ) : (
         <>
           {section === 'locations' && <LocationsSetup profile={profile} data={data} onChanged={reload} />}
+          {section === 'layout' && <LayoutEditor locations={data.locations} onPatch={patchLocation} />}
           {section === 'types' && <LocationTypesSetup profile={profile} data={data} onChanged={reload} />}
           {section === 'userTypes' && (
             <UserTypesSetup

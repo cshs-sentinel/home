@@ -25,7 +25,15 @@ export type Location = {
   name: string;
   environment: Environment;
   parent_id: string | null;
+  grid_cols: number;
+  grid_rows: number;
+  layout_x: number | null;
+  layout_y: number | null;
+  layout_w: number | null;
+  layout_h: number | null;
 };
+
+export type Block = { x: number; y: number; w: number; h: number };
 
 export type SetupLocation = Location & {
   category_id: string;

@@ -16,6 +16,7 @@ import type { Quake, WeatherSnapshot } from '../lib/weather';
 import type { Role } from '../roles';
 import { BarList, ChartCard, ColumnChart, LineChart, StatTile, StatusChip } from './Charts';
 import { WeatherPanel, shortDay } from './WeatherPanel';
+import { CampusMap } from './CampusMap';
 
 const RANGES = [7, 14, 30] as const;
 
@@ -57,6 +58,8 @@ export function InsightsPanel({ role, data, weather, quakes, weatherError, onDra
           <InsightCard key={insight.id} insight={insight} onDraftAlert={onDraftAlert} />
         ))}
       </section>
+
+      <CampusMap role={role} days={days} locations={data.locations} submissions={data.submissions} incidents={data.incidents} checkIns={data.checkIns} />
 
       <WeatherPanel weather={weather} quakes={quakes} error={weatherError} />
 
