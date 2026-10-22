@@ -46,7 +46,7 @@ function useAuth() {
     setStatus('loading');
     supabase
       .from('profiles')
-      .select('id, role, display_name, school_id, user_type_id, primary_location_id')
+      .select('id, role, display_name, school_id, user_type_id, primary_location_id, status')
       .eq('id', userId)
       .single()
       .then(async ({ data, error }) => {
@@ -74,7 +74,7 @@ function useAuth() {
   // the default location changes).
   const refreshProfile = useCallback(async () => {
     if (!userId) return;
-    const { data } = await supabase.from('profiles').select('id, role, display_name, school_id, user_type_id, primary_location_id').eq('id', userId).single();
+    const { data } = await supabase.from('profiles').select('id, role, display_name, school_id, user_type_id, primary_location_id, status').eq('id', userId).single();
     if (data) setProfile(data as Profile);
   }, [userId]);
 
@@ -145,6 +145,26 @@ function LoginCard({ onSignUp }: { onSignUp: () => void }) {
           ))}
         </ul>
       )}
+    </article>
+  );
+}
+
+// Shown instead of the workspace while a self-registered Community Member
+// is waiting for a School Admin or System Admin to approve the account, or
+// after that registration was declined. Admin-created accounts skip this.
+function PendingApprovalCard({ status }: { status: 'pending' | 'rejected' }) {
+  return (
+    <article className="login-card">
+      <p className="eyebrow">{status === 'pending' ? 'AWAITING APPROVAL' : 'REGISTRATION DECLINED'}</p>
+      <h3>{status === 'pending' ? 'Your registration is awaiting approval' : 'Your registration was not approved'}</h3>
+      <p className="lede">
+        {status === 'pending'
+          ? 'A School Admin or System Admin needs to approve your account before you can sign in to SENTINEL. Check back soon.'
+          : 'Contact your School Admin or System Admin if you think this is a mistake.'}
+      </p>
+      <button type="button" className="secondary" onClick={() => supabase.auth.signOut()}>
+        Sign out
+      </button>
     </article>
   );
 }
@@ -265,7 +285,10 @@ export function App() {
       <section className="access">
         {status === 'loading' && <p>Loading…</p>}
         {status === 'ready' && !session && <AuthCards />}
-        {status === 'ready' && session && profile && <Workspace key={profile.id + (userType?.id ?? '')} profile={profile} userType={userType} schoolName={schoolName} email={session.user.email ?? ''} onProfileChanged={refreshProfile} />}
+        {status === 'ready' && session && profile && profile.status && profile.status !== 'approved' && <PendingApprovalCard status={profile.status} />}
+        {status === 'ready' && session && profile && (!profile.status || profile.status === 'approved') && (
+          <Workspace key={profile.id + (userType?.id ?? '')} profile={profile} userType={userType} schoolName={schoolName} email={session.user.email ?? ''} onProfileChanged={refreshProfile} />
+        )}
         {status === 'ready' && session && !profile && <p className="error-text">Signed in, but no profile was found for this account.</p>}
       </section>
     </main>

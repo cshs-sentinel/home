@@ -21,3 +21,6 @@ coverage/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Supabase CLI local cache
+supabase/.temp/

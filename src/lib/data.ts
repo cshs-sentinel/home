@@ -66,7 +66,7 @@ export function useSchoolData(profile: Profile) {
         .order('created_at', { ascending: false })
         .limit(100),
       managesPeople
-        ? supabase.from('profiles').select('id, role, display_name, school_id, user_type_id, primary_location_id, is_active').order('display_name')
+        ? supabase.from('profiles').select('id, role, display_name, school_id, user_type_id, primary_location_id, is_active, status').order('display_name')
         : Promise.resolve({ data: [], error: null }),
       managesPeople
         ? supabase.from('user_types').select(USER_TYPE_COLUMNS).order('name')
@@ -331,4 +331,43 @@ export async function registerAccount(input: { email: string; password: string; 
 export async function setMyDefaultLocation(locationId: string): Promise<Result> {
   const { error } = await supabase.rpc('set_my_default_location', { p_location_id: locationId });
   return toResult(error);
+}
+
+// --- Approving or rejecting a pending self-registration ---
+
+export async function approveRegistration(userId: string): Promise<Result> {
+  const { error } = await supabase.rpc('approve_registration', { target_user_id: userId });
+  return toResult(error);
+}
+
+export async function rejectRegistration(userId: string): Promise<Result> {
+  const { error } = await supabase.rpc('reject_registration', { target_user_id: userId });
+  return toResult(error);
+}
+
+// --- Adding a person directly (School Admin, System Admin) ---
+//
+// Calls the admin-create-user Edge Function, which runs with the service
+// key: the only client-side code allowed to create an account outside
+// public sign-up. A random password is generated and discarded server-side;
+// the admin shares the returned one-time setup link instead.
+
+export type AddPersonResult = Result & { setupLink?: string | null; email?: string };
+
+export async function addPerson(input: { email: string; displayName: string; designationId: string }): Promise<AddPersonResult> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) return { error: 'Sign in again and try once more.' };
+  try {
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ email: input.email.trim(), display_name: input.displayName.trim(), designation_id: input.designationId }),
+    });
+    const body = await res.json().catch(() => ({}) as { error?: string; setupLink?: string | null; email?: string });
+    if (!res.ok) return { error: friendlyError(body.error ?? 'Could not add this person.') };
+    return { error: null, setupLink: body.setupLink ?? null, email: body.email };
+  } catch {
+    return { error: 'Network error. Check your connection and try again.' };
+  }
 }

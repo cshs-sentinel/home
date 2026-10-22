@@ -4,9 +4,19 @@
 // deactivated and blocked from signing in rather than deleted, because they own
 // audit-log rows, so every role in docs/roles-and-permissions.md can be
 // signed in and previewed. Accounts are marked app_metadata.provisioned =
-// 'admin', which the sign-up trigger requires for accounts that are created
-// without registration details (only the service key can set it). Requires SUPABASE_SERVICE_ROLE_KEY — run locally only,
-// never in the browser/frontend bundle.
+// 'admin' and then synced directly with the service key, which bypasses the
+// registration trigger entirely for accounts that already exist. Requires
+// SUPABASE_SERVICE_ROLE_KEY — run locally only, never in the browser/frontend
+// bundle.
+//
+// NOTE: as of migration 0014, the trigger no longer honors
+// app_metadata.provisioned for a brand-new account (live testing found
+// custom app_metadata isn't visible to it at insert time); it needs a
+// one-time secret in user_metadata instead (see admin-create-user). This
+// script still works for re-syncing the accounts already listed below,
+// because ensureUser() falls back to looking the account up when it already
+// exists. To add a genuinely new account, use the in-app People > Add
+// person flow instead of this script.
 //
 // Usage: node scripts/seed-sample-accounts.mjs
 

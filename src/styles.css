@@ -408,6 +408,8 @@ header {
 .alert-item small { color: var(--card-muted); font-family: var(--font-mono); font-size: 11px; }
 .composer { margin-top: 8px; display: flex; flex-direction: column; gap: 12px; max-width: 640px; }
 .composer .section-title { margin-bottom: 0; }
+.composer form { display: flex; flex-direction: column; gap: 12px; }
+.notice code { display: inline-block; margin-top: 6px; padding: 8px 10px; border-radius: 6px; background: var(--input-bg); border: 1px solid var(--border); font-size: 12px; word-break: break-all; }
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
 .field input, .field textarea, .role-select { font: inherit; font-family: var(--font-body); font-size: 15px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); }
 .role-select { min-height: 44px; }

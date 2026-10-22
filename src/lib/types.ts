@@ -1,5 +1,7 @@
 import type { Role } from '../roles';
 
+export type RegistrationStatus = 'pending' | 'approved' | 'rejected';
+
 export type Profile = {
   id: string;
   role: Role;
@@ -8,6 +10,7 @@ export type Profile = {
   user_type_id: string | null;
   primary_location_id: string | null;
   is_active?: boolean;
+  status?: RegistrationStatus;
 };
 
 // A designation (position). It maps to exactly one primary role.
