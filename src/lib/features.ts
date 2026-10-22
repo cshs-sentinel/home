@@ -78,18 +78,25 @@ export function effectiveFeatures(role: Role, typeFeatures: string[] | null): Se
   return new Set(chosen.filter((f): f is Feature => ceiling.has(f as Feature)));
 }
 
-export function tabsFor(features: Set<Feature>): Tab[] {
+export type Nav = { primary: Tab[]; more: Tab[] };
+
+// Insight roles get Map and Analytics up front and everything else under
+// More. Other roles keep a short, flat list of tabs.
+export function navFor(features: Set<Feature>): Nav {
   const has = (f: Feature) => features.has(f);
   const available: Record<Tab, boolean> = {
-    insights: has('insights.view'),
+    map: has('insights.view'),
+    analytics: has('insights.view'),
     queue: has('queue.view'),
     alerts: has('alerts.view') || has('alerts.draft') || has('alerts.approve'),
     report: REPORT.some(has),
     people: has('people.manage'),
     setup: has('setup.locations') || has('setup.user_types'),
   };
-  const order: Tab[] = available.insights
-    ? ['insights', 'queue', 'alerts', 'report', 'people', 'setup']
-    : ['setup', 'people', 'report', 'alerts', 'queue'];
-  return order.filter((t) => available[t]);
+  if (available.map) {
+    const more: Tab[] = ['queue', 'alerts', 'report', 'people', 'setup'];
+    return { primary: ['map', 'analytics'], more: more.filter((t) => available[t]) };
+  }
+  const order: Tab[] = ['setup', 'people', 'report', 'alerts', 'queue'];
+  return { primary: order.filter((t) => available[t]), more: [] };
 }

@@ -5,15 +5,17 @@ import { roleDetails, TAB_LABELS, type Role, type Tab } from './roles';
 import demoAccounts from './demo-accounts.json';
 import { THEME_LABELS, useTheme } from './theme';
 import type { Profile, UserType } from './lib/types';
-import { useExternalData, useSchoolData } from './lib/data';
-import type { AlertTemplate } from './lib/analytics';
+import { useExternalData, useSchoolData, type SchoolData } from './lib/data';
+import { incidentSummary, sentimentSummary, since, type AlertTemplate } from './lib/analytics';
 import { ReportPanel } from './components/ReportPanel';
-import { InsightsPanel } from './components/InsightsPanel';
+import { AnalyticsPanel, type Range } from './components/AnalyticsPanel';
+import { MapPanel } from './components/MapPanel';
+import { MoreMenu } from './components/MoreMenu';
 import { QueuePanel } from './components/QueuePanel';
 import { AlertsPanel } from './components/AlertsPanel';
 import { PeoplePanel } from './components/PeoplePanel';
 import { SetupPanel } from './components/SetupPanel';
-import { effectiveFeatures, tabsFor } from './lib/features';
+import { effectiveFeatures, navFor } from './lib/features';
 
 function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
@@ -130,12 +132,15 @@ function LoginCard() {
 function Workspace({ profile, schoolName, email, userType }: { profile: Profile; schoolName: string | null; email: string; userType: UserType | null }) {
   const details = roleDetails[profile.role];
   const features = useMemo(() => effectiveFeatures(profile.role, userType?.features ?? null), [profile.role, userType]);
-  const tabs = tabsFor(features);
-  const [tab, setTab] = useState<Tab>(tabs[0] ?? 'report');
+  const nav = navFor(features);
+  const tabs = [...nav.primary, ...nav.more];
+  const [tab, setTab] = useState<Tab>(nav.primary[0] ?? 'report');
+  const [days, setDays] = useState<Range>(14);
   const [template, setTemplate] = useState<AlertTemplate | null>(null);
   const { data, loading, error, reload } = useSchoolData(profile);
   const external = useExternalData();
   const latestAlert = data.alerts.find((a) => a.status === 'published' && a.severity !== 'info');
+  const queueUrgent = useMemo(() => urgentCount(profile.role, data), [profile.role, data]);
 
   function draftFromInsight(t: AlertTemplate) {
     setTemplate(t);
@@ -171,20 +176,23 @@ function Workspace({ profile, schoolName, email, userType }: { profile: Profile;
 
       {tabs.length > 1 && (
         <nav className="tab-bar" aria-label="Sections">
-          {tabs.map((t) => (
+          {nav.primary.map((t) => (
             <button type="button" key={t} className={`tab-button${tab === t ? ' is-active' : ''}`} aria-current={tab === t ? 'page' : undefined} onClick={() => setTab(t)}>
               <span aria-hidden="true">{TAB_LABELS[t].icon}</span>
               <span>{TAB_LABELS[t].label}</span>
+              {t === 'queue' && queueUrgent > 0 && <span className="badge">{queueUrgent}</span>}
             </button>
           ))}
+          {nav.more.length > 0 && <MoreMenu items={nav.more} active={tab} badges={{ queue: queueUrgent }} onSelect={setTab} />}
         </nav>
       )}
 
       {error && <p className="error-text">Some data could not load: {error}</p>}
       <div className={`panel${loading ? ' is-loading' : ''}`}>
         {tab === 'report' && tabs.includes('report') && <ReportPanel profile={profile} features={features} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onSent={reload} />}
-        {tab === 'insights' && tabs.includes('insights') && (
-          <InsightsPanel role={profile.role} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} onDraftAlert={draftFromInsight} />
+        {tab === 'map' && tabs.includes('map') && <MapPanel role={profile.role} days={days} onDays={setDays} data={data} />}
+        {tab === 'analytics' && tabs.includes('analytics') && (
+          <AnalyticsPanel role={profile.role} days={days} onDays={setDays} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} onDraftAlert={draftFromInsight} />
         )}
         {tab === 'queue' && tabs.includes('queue') && <QueuePanel role={profile.role} data={data} onChanged={reload} />}
         {tab === 'alerts' && tabs.includes('alerts') && (
@@ -195,6 +203,17 @@ function Workspace({ profile, schoolName, email, userType }: { profile: Profile;
       </div>
     </div>
   );
+}
+
+// Items behind the More menu that should not wait: help requests and
+// unacknowledged incidents for responders, unresolved crisis follow-ups for Guidance.
+function urgentCount(role: Role, data: SchoolData): number {
+  if (role === 'security' || role === 'drrm' || role === 'school_admin') {
+    const help = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help').length;
+    return help + incidentSummary(data.incidents).unacknowledged;
+  }
+  if (role === 'guidance') return sentimentSummary(data.submissions).needsFollowUp.length;
+  return 0;
 }
 
 export function App() {

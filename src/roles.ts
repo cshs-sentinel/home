@@ -10,13 +10,14 @@ export type Role =
   | 'school_admin'
   | 'system_admin';
 
-export type Tab = 'report' | 'insights' | 'queue' | 'alerts' | 'people' | 'setup';
+export type Tab = 'report' | 'map' | 'analytics' | 'queue' | 'alerts' | 'people' | 'setup';
 
 export const ROLE_ORDER: Role[] = ['student', 'teacher', 'non_teaching', 'security', 'drrm', 'guidance', 'school_admin', 'system_admin'];
 
 export const TAB_LABELS: Record<Tab, { label: string; icon: string }> = {
   report: { label: 'Report', icon: '✚' },
-  insights: { label: 'Insights', icon: '◔' },
+  map: { label: 'Map', icon: '🗺' },
+  analytics: { label: 'Analytics', icon: '◔' },
   queue: { label: 'Queue', icon: '☰' },
   alerts: { label: 'Alerts', icon: '📣' },
   people: { label: 'People', icon: '👥' },

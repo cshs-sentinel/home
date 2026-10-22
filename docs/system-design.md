@@ -66,11 +66,12 @@ flowchart LR
 | Feature catalog | `src/lib/features.ts` | Features, the most each base role can have, defaults, and menu order |
 | Setup | `src/components/SetupPanel.tsx` | Locations tree, map layout, location types, user types |
 | Layout editor | `src/components/LayoutEditor.tsx` | Drag-and-drop grid editor for the campus map |
-| Campus map | `src/components/CampusMap.tsx` | Heatmap of the campus, drill-down, and per-place details |
+| Map | `src/components/MapPanel.tsx` | Map tab: heatmap types, filters, drill-down, and per-place details |
+| More menu | `src/components/MoreMenu.tsx` | Hidden menus with urgent badges |
 | Overview map | `src/components/NestedMap.tsx` | Whole campus in one nested picture, auto-tiling undrawn places |
 | Reporting | `src/components/ReportPanel.tsx` | Button-only flows: help, safe, feelings, hazard, incident, suggestion |
 | Place picker | `src/components/PlacePicker.tsx` | Cascading dropdowns from campus down to room |
-| Insights | `src/components/InsightsPanel.tsx` | Decision cards, KPIs, and charts per role |
+| Analytics | `src/components/AnalyticsPanel.tsx` | Analytics tab: decision cards, weather, KPIs, and charts per role |
 | Queue | `src/components/QueuePanel.tsx` | Help requests, incident workflow, report review |
 | Alerts | `src/components/AlertsPanel.tsx` | Weather, published alerts, drafting, approval |
 | People | `src/components/PeoplePanel.tsx` | Assign user types and view the audit log |
@@ -83,7 +84,7 @@ flowchart LR
 | Theme | `src/theme.ts` | Light, Dark, and Neon themes |
 | Demo accounts | `scripts/seed-sample-accounts.mjs` | One login per role |
 | Demo activity | `scripts/seed-demo-activity.mjs` | 14 days of synthetic, tagged activity; `--clean` removes it |
-| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types; `0004` adds map layout fields; `0005` sets the Campus › Building › Floor › Room hierarchy |
+| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types; `0004` adds map layout fields; `0005` sets the Campus › Building › Floor › Room hierarchy; `0006` adds privacy-safe sentiment totals |
 
 ## 4. Data model
 
@@ -120,13 +121,24 @@ other user types on top of these roles (see [School setup](#6-school-setup)).
 | Role | Default menus | What they can do |
 | --- | --- | --- |
 | Student | Report, Alerts | Send help requests, check-ins, feelings, hazards, incidents, suggestions. Track their own incidents and check-ins. See alerts and weather. |
-| Teacher | Report, Insights, Queue, Alerts | Everything a student can do. Review and resolve non-confidential reports. See report trends, hotspots, and bullying counts. |
+| Teacher | Map, Analytics · More: Queue, Alerts, Report | Everything a student can do. Review and resolve non-confidential reports. See report trends, hotspots, and bullying counts. |
 | Non-Teaching Staff | Report, Alerts | Same as Student. |
-| Security | Insights, Queue, Report, Alerts | See every incident and help request. Move incidents through the workflow. Review non-confidential reports. |
-| DRRM Coordinator | Insights, Queue, Alerts, Report | Same as Security, plus drafting alerts. Weather and hazard insights offer a one-tap draft. |
-| Guidance Counselor | Insights, Queue, Report, Alerts | The only role that reads individual feelings. Wellbeing analytics, follow-up queue, stress trends. |
-| School Admin | Insights, Queue, Alerts, People, Report | Everything responders see, approving, publishing, and withdrawing alerts, changing roles, and the audit log. Sees only a **count** of open wellbeing reports. |
+| Security | Map, Analytics · More: Queue, Alerts, Report | See every incident and help request. Move incidents through the workflow. Review non-confidential reports. |
+| DRRM Coordinator | Map, Analytics · More: Queue, Alerts, Report | Same as Security, plus drafting alerts. Weather and hazard insights offer a one-tap draft. |
+| Guidance Counselor | Map, Analytics · More: Queue, Alerts, Report | The only role that reads individual feelings. Wellbeing analytics, follow-up queue, stress trends. |
+| School Admin | Map, Analytics · More: Queue, Alerts, Report, People | Everything responders see, approving, publishing, and withdrawing alerts, changing roles, and the audit log. Sees feelings only as privacy-safe totals per place, never individual entries. |
 | System Admin | Setup, People, Report | Configure the campus and places, location types, and user types. Assign user types (including System Admin) and read the audit log. No access to reports, incidents, or wellbeing data. |
+
+Navigation (`navFor()` in `src/lib/features.ts`):
+
+- Roles with `insights.view` get **Map** and **Analytics** in the tab bar, and every other menu
+  they can use (Queue, Alerts, Report, People, Setup) behind **More (⋯)**. More is a dropdown on
+  desktop and a sheet above the bottom bar on phones.
+- A red badge on More and on Queue keeps urgent work visible: help requests in the last 24 hours
+  plus unacknowledged incidents for Security, DRRM, and School Admin, and unresolved crisis
+  feelings (hopeless, lonely, or stress 5) for Guidance.
+- Map and Analytics share one period (7, 14, or 30 days).
+- Roles without `insights.view` keep a short flat tab bar and no More menu.
 
 Enforcement:
 
@@ -201,26 +213,47 @@ that exist but are not drawn on a map that has other places drawn.
 
 - In Setup › Map layout, tapping any block opens that level in the editor (a room opens its
   floor).
-- In Insights › Campus map, Whole campus is the default view. Rooms and other leaf places are
-  shaded by the selected layer, so hotspots across all buildings show at once. Tapping a block
-  shows its full path and latest items, and the table lists every place by full path.
+- In the **Map** tab, Whole campus is the default view. Rooms and other leaf places are shaded by
+  the selected heatmap, so hotspots across all buildings show at once. Tapping a block shows its
+  full path and latest items, and the table lists every place by full path.
 
-### Campus map and heatmap
+### Map tab and heatmaps
 
-Insights roles (Teacher, Security, DRRM, Guidance, School Admin) see a **Campus map** in Insights
-with the same layout. Each block is shaded by activity in the selected period, counting
-everything inside that place:
+Insight roles (Teacher, Security, DRRM, Guidance, School Admin) have a **Map** tab
+(`src/components/MapPanel.tsx`) with the same layout. Each block is shaded by activity in the
+selected period, counting everything inside that place. Controls, top to bottom: period, view
+(Whole campus / One level), heatmap type, then type filter and "Still needs a response".
 
-| Layer | Who | Shading |
-| --- | --- | --- |
-| Reports and incidents | All insight roles (each sees only rows RLS allows) | Count |
-| Help requests | Security, DRRM, School Admin | Count of "I need help" check-ins |
-| Average stress | Guidance only | Average stress, 1–5 |
+| Heatmap | Who | Shading | Type filter |
+| --- | --- | --- | --- |
+| All reports | All insight roles | Count of non-sentiment submissions and incidents | — |
+| Incidents | All insight roles (Teacher and Guidance see only their own) | Count | Emergency, Medical, Security, Other |
+| Hazards | All insight roles | Count of `incident_hazard` submissions | Unsafe condition, Bullying, Suspicious activity |
+| Concerns and suggestions | All insight roles | Count of `observation` submissions | Safety concern, General report, Suggestion |
+| Help requests | Security, DRRM, School Admin | Count of "I need help" check-ins | — |
+| Sentiment | Guidance (own rows), School Admin (totals only) | Average stress, 1–5 | Guidance: Negative feelings only |
+
+"Still needs a response" limits counts to open incidents and unresolved submissions. It does not
+apply to Help requests or to the School Admin's Sentiment layer.
 
 Tapping a block lists its latest items with their status, and **Open map ›** drills in. Reports
 filed at the parent itself, and places not yet on the map, are listed under the grid so nothing
 is hidden. Every map has a table view. Shading uses one sequential color per theme, and labels
 sit on a surface chip so they stay readable at any intensity.
+
+### Sentiment totals for School Admin
+
+School Admins cannot read individual feelings. Their Sentiment heatmap comes from
+`sentiment_by_location(p_days)` (migration `0006`), which only School Admin and Guidance can call:
+
+- Each feeling counts toward its place and every place above it, computed in the database.
+- Places with fewer than 3 feelings are not returned.
+- **Complementary suppression:** inside any place that is shown, the feelings that are hidden
+  (hidden child places plus feelings filed at the place itself) must total 0 or at least 3.
+  Otherwise the smallest shown child, or the place itself, is hidden too, and the check repeats.
+  This stops a small group from being worked out by subtracting shown totals from a parent total.
+- The map shows hidden places as "too few", and the details panel shows totals only, with no
+  list of entries.
 
 ### Location types
 
@@ -247,7 +280,7 @@ Features:
 | --- | --- | --- |
 | `report.help`, `report.safe`, `report.feeling`, `report.hazard`, `report.incident`, `report.observation` | The six report buttons | All |
 | `alerts.view` | Alerts menu (weather and published alerts) | All |
-| `insights.view`, `queue.view` | Insights and Queue menus | Teacher, Security, DRRM, Guidance, School Admin |
+| `insights.view`, `queue.view` | Map, Analytics, and Queue menus | Teacher, Security, DRRM, Guidance, School Admin |
 | `alerts.draft` | Drafting alerts | DRRM, School Admin |
 | `alerts.approve` | Approving, publishing, withdrawing alerts | School Admin |
 | `people.manage` | People menu | School Admin, System Admin |

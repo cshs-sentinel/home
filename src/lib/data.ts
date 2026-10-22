@@ -284,3 +284,12 @@ export async function setGridSize(locationId: string, cols: number, rows: number
   const { error } = await supabase.from('locations').update({ grid_cols: cols, grid_rows: rows }).eq('id', locationId);
   return toResult(error);
 }
+
+export type PlaceSentiment = { location_id: string; entries: number; avg_stress: number };
+
+// Privacy-safe totals: places with fewer than 3 feelings, or whose small
+// groups could be worked out by subtraction, are left out by the database.
+export async function fetchSentimentByLocation(days: number): Promise<{ data: PlaceSentiment[]; error: string | null }> {
+  const { data, error } = await supabase.rpc('sentiment_by_location', { p_days: days });
+  return { data: ((data ?? []) as PlaceSentiment[]).map((r) => ({ ...r, avg_stress: Number(r.avg_stress) })), error: error ? friendlyError(error.message) : null };
+}

@@ -567,3 +567,31 @@ header {
 .nm-block[data-depth="1"] > .nm-label { font-size: 12px; }
 .nm-inner { position: relative; flex: 1; margin: 0 3px 3px; }
 .nm-hidden { position: absolute; right: 2px; bottom: 2px; padding: 0 5px; border-radius: 999px; background: var(--surface); border: 1px dashed var(--border-strong); font-size: 9px; color: var(--muted); }
+
+/* Map / Analytics / More navigation */
+.tab-bar { overflow: visible; }
+.badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--sev-critical); color: #ffffff; font-family: var(--font-mono); font-size: 10px; font-weight: 700; line-height: 1; }
+.more-wrap { position: relative; display: flex; }
+.more-button { white-space: nowrap; }
+.more-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; min-width: 220px; padding: 6px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 12px 32px var(--shadow); display: flex; flex-direction: column; gap: 2px; animation: rise 0.25s var(--ease) both; }
+.more-item { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 10px 12px; border: 0; border-radius: 8px; background: none; color: var(--text); text-align: left; font-weight: 600; }
+.more-item:hover, .more-item:focus-visible { background: var(--bg); outline: none; }
+.more-item.is-active { background: var(--icon-bg); }
+.more-label { flex: 1; }
+
+/* Map tab controls */
+.map-panel .map-card { margin-top: 12px; }
+.map-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+.control-label { min-width: 64px; font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--eyebrow); }
+.map-controls .chip-row { flex: 1; }
+.map-controls .filter-button { text-transform: none; min-height: 36px; padding: 6px 12px; }
+.open-only { margin: 0 0 0 4px; font-size: 13px; }
+.privacy-note { margin: 10px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--bg); border: 1px dashed var(--border-strong); }
+
+@media (max-width: 740px) {
+  .more-menu { position: fixed; top: auto; left: 10px; right: 10px; bottom: calc(76px + env(safe-area-inset-bottom)); min-width: 0; border-radius: 16px; }
+  .more-wrap { flex: 1; }
+  .more-wrap .more-button { flex: 1; }
+  .more-button .badge { position: absolute; top: 4px; right: calc(50% - 26px); }
+  .control-label { min-width: 0; width: 100%; }
+}

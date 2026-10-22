@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   countBy,
   dailyAverage,
@@ -16,12 +16,26 @@ import type { Quake, WeatherSnapshot } from '../lib/weather';
 import type { Role } from '../roles';
 import { BarList, ChartCard, ColumnChart, LineChart, StatTile, StatusChip } from './Charts';
 import { WeatherPanel, shortDay } from './WeatherPanel';
-import { CampusMap } from './CampusMap';
 
-const RANGES = [7, 14, 30] as const;
+export const RANGES = [7, 14, 30] as const;
+export type Range = (typeof RANGES)[number];
+
+export function RangeFilter({ days, onDays }: { days: Range; onDays: (d: Range) => void }) {
+  return (
+    <div className="filter-row" role="group" aria-label="Time range">
+      {RANGES.map((r) => (
+        <button type="button" key={r} className={`filter-button${days === r ? ' is-active' : ''}`} aria-pressed={days === r} onClick={() => onDays(r)}>
+          Last {r} days
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type Props = {
   role: Role;
+  days: Range;
+  onDays: (d: Range) => void;
   data: SchoolData;
   weather: WeatherSnapshot | null;
   quakes: Quake[];
@@ -29,9 +43,7 @@ type Props = {
   onDraftAlert: (template: AlertTemplate) => void;
 };
 
-export function InsightsPanel({ role, data, weather, quakes, weatherError, onDraftAlert }: Props) {
-  const [days, setDays] = useState<(typeof RANGES)[number]>(14);
-
+export function AnalyticsPanel({ role, days, onDays, data, weather, quakes, weatherError, onDraftAlert }: Props) {
   const insights = useMemo(
     () => generateInsights({ role, weather, quakes, submissions: data.submissions, incidents: data.incidents, checkIns: data.checkIns, locations: data.locations }),
     [role, weather, quakes, data],
@@ -44,13 +56,7 @@ export function InsightsPanel({ role, data, weather, quakes, weatherError, onDra
 
   return (
     <div className="insights">
-      <div className="filter-row" role="group" aria-label="Time range">
-        {RANGES.map((r) => (
-          <button type="button" key={r} className={`filter-button${days === r ? ' is-active' : ''}`} aria-pressed={days === r} onClick={() => setDays(r)}>
-            Last {r} days
-          </button>
-        ))}
-      </div>
+      <RangeFilter days={days} onDays={onDays} />
 
       <section className="insight-list" aria-label="What needs attention">
         <h2 className="section-title">What needs attention</h2>
@@ -58,8 +64,6 @@ export function InsightsPanel({ role, data, weather, quakes, weatherError, onDra
           <InsightCard key={insight.id} insight={insight} onDraftAlert={onDraftAlert} />
         ))}
       </section>
-
-      <CampusMap role={role} days={days} locations={data.locations} submissions={data.submissions} incidents={data.incidents} checkIns={data.checkIns} />
 
       <WeatherPanel weather={weather} quakes={quakes} error={weatherError} />
 
