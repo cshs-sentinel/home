@@ -57,6 +57,16 @@ export function blockStyle(b: Block, cols: number, rows: number) {
   };
 }
 
+// "Admin › 1st Floor › Room 101". The campus is left out when there is only one.
+export function placeLabel(id: string | null, locations: Location[]): string {
+  if (!id) return 'No location';
+  const path = pathTo(id, locations);
+  if (!path.length) return 'Unknown location';
+  const singleCampus = locations.filter((l) => !l.parent_id).length === 1;
+  const shown = singleCampus && path.length > 1 ? path.slice(1) : path;
+  return shown.map((p) => p.name).join(' › ');
+}
+
 // Mirrors public.location_fits(): Campus > Building > Floor or wing > Room,
 // and other locations (level 5) inside a campus, building, or floor.
 export function locationFits(childLevel: number, parentLevel: number | null): boolean {

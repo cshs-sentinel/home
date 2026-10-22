@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { EMOTIONS, HAZARDS, INCIDENTS, OBSERVATIONS, STRESS_LEVELS, iconFor, labelFor, type Option } from '../lib/catalog';
 import { checkIn, raiseIncident, sendSubmission, transitionIncident } from '../lib/data';
-import { locationName, OPEN_INCIDENT } from '../lib/analytics';
+import { OPEN_INCIDENT } from '../lib/analytics';
 import type { CheckIn, Incident, Location, Profile } from '../lib/types';
 import type { Feature } from '../lib/features';
+import { placeLabel } from '../lib/layout';
+import { PlacePicker } from './PlacePicker';
 
 type Flow = 'feel' | 'hazard' | 'incident' | 'observation' | 'safe' | 'help';
 type Step = 'choice' | 'stress' | 'location' | 'review';
@@ -84,7 +86,7 @@ export function ReportPanel({ profile, features, locations, incidents, checkIns,
     if (!flow) return;
     setSending(true);
     setError('');
-    const place = locationId ? locationName(locations, locationId) : null;
+    const place = locationId ? placeLabel(locationId, locations) : null;
     const where = place ? ` at ${place}` : '';
     let result: { error: string | null; caseRef?: string };
 
@@ -194,32 +196,18 @@ export function ReportPanel({ profile, features, locations, incidents, checkIns,
         {step === 'location' && (
           <>
             <h2 className="flow-question">{flow === 'help' ? 'Where are you?' : 'Where is this?'}</h2>
-            <div className="place-grid">
-              <button
-                type="button"
-                className="place-button skip"
-                onClick={() => {
-                  setLocationId(null);
-                  setStep('review');
-                }}
-              >
-                Skip
-              </button>
-              {locations.map((l) => (
-                <button
-                  type="button"
-                  key={l.id}
-                  className="place-button"
-                  onClick={() => {
-                    setLocationId(l.id);
-                    setStep('review');
-                  }}
-                >
-                  {l.environment === 'outdoor' ? '🌳 ' : ''}
-                  {l.name}
-                </button>
-              ))}
-            </div>
+            <PlacePicker
+              locations={locations}
+              initial={locationId}
+              onPick={(id) => {
+                setLocationId(id);
+                setStep('review');
+              }}
+              onSkip={() => {
+                setLocationId(null);
+                setStep('review');
+              }}
+            />
           </>
         )}
 
@@ -233,7 +221,7 @@ export function ReportPanel({ profile, features, locations, incidents, checkIns,
                 </li>
               )}
               {stress && <li>Stress {stress} of 5</li>}
-              <li>📍 {locationId ? locationName(locations, locationId) : 'No location'}</li>
+              <li>📍 {placeLabel(locationId, locations)}</li>
             </ul>
             {error && (
               <p className="error-text" role="alert">
@@ -272,7 +260,7 @@ export function ReportPanel({ profile, features, locations, incidents, checkIns,
                 <span aria-hidden="true">{iconFor(i.category)}</span>
                 <span className="activity-main">
                   <strong>{i.case_ref}</strong> · {labelFor(i.category)}
-                  <small>{locationName(locations, i.location_id)}</small>
+                  <small>{placeLabel(i.location_id, locations)}</small>
                 </span>
                 <span className={`chip status-${i.status}`}>{i.status.replace('_', ' ')}</span>
                 {OPEN_INCIDENT.includes(i.status) && i.status === 'new' && (

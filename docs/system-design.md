@@ -68,6 +68,7 @@ flowchart LR
 | Layout editor | `src/components/LayoutEditor.tsx` | Drag-and-drop grid editor for the campus map |
 | Campus map | `src/components/CampusMap.tsx` | Heatmap of the campus, drill-down, and per-place details |
 | Reporting | `src/components/ReportPanel.tsx` | Button-only flows: help, safe, feelings, hazard, incident, suggestion |
+| Place picker | `src/components/PlacePicker.tsx` | Cascading dropdowns from campus down to room |
 | Insights | `src/components/InsightsPanel.tsx` | Decision cards, KPIs, and charts per role |
 | Queue | `src/components/QueuePanel.tsx` | Help requests, incident workflow, report review |
 | Alerts | `src/components/AlertsPanel.tsx` | Weather, published alerts, drafting, approval |
@@ -258,7 +259,13 @@ The Report tab opens with six large buttons:
 | Report an incident | Category (4) → Place → Send | `incidents` (case reference returned) |
 | Suggest or observe | Type (3) → Place → Send | `submissions` kind `observation` |
 
-Every place step has a Skip button. Each flow ends with a summary, a single large Send button, and
+The place step (`PlacePicker`) is a set of cascading dropdowns that follows the location tiers:
+Campus, then Building or area, then Floor, wing, or area, then Room or area. Each dropdown lists
+only the places inside the choice above it, so nobody scrolls a flat list of every room. With one
+campus it is pre-selected. "Anywhere in …" stops at the current level, and the review shows the
+full path (for example "Admin › 1st Floor › Room 101"). A Skip button sends without a place.
+
+Each flow ends with a summary, a single large Send button, and
 a short note on who can see the report. On phones, tap targets are at least 48 px, choices use
 a 2-column grid, and the role tabs sit in a bottom bar.
 
