@@ -81,7 +81,7 @@ flowchart LR
 | Theme | `src/theme.ts` | Light, Dark, and Neon themes |
 | Demo accounts | `scripts/seed-sample-accounts.mjs` | One login per role |
 | Demo activity | `scripts/seed-demo-activity.mjs` | 14 days of synthetic, tagged activity; `--clean` removes it |
-| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types; `0004` adds map layout fields |
+| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types; `0004` adds map layout fields; `0005` sets the Campus › Building › Floor › Room hierarchy |
 
 ## 4. Data model
 
@@ -96,7 +96,7 @@ All tables are in `public`, have RLS enabled, and are scoped by `school_id`.
 | `incidents` | Cases with a generated `case_ref` (`SNT-YYYY-NNNN`) | Category: emergency, medical, security, other. Status new → acknowledged → assigned → in_progress → resolved → closed, or cancelled |
 | `incident_notifications` | One row per new incident, created by a trigger | Read by reviewers |
 | `alerts` | Announcements | Severity info, advisory, urgent. Target everyone, responders, or one role. Status draft → approved → published, or cancelled / corrected |
-| `location_categories` | Location types, such as Building, Room, or CR | `level` 1–4 and `environment` |
+| `location_categories` | Location types, such as Building, Room, or CR | `level` (tier) 1–5 and `environment` |
 | `locations` | The campus tree, from campus to rooms and areas | `parent_id`, `category_id`, `status`. Active locations become the place buttons |
 | `weather_observations` | Stored weather readings | Not used by the app yet (see gaps) |
 | `audit_logs` | Role changes, alert workflow, and other changes to sensitive data | Read by school and system admins |
@@ -145,20 +145,26 @@ The System Admin's **Setup** menu has three sections.
 
 ### Locations
 
-The campus is a tree of places. Each place has a location type, and each type has a level:
+The campus is a tree of places. Each place has a location type, and each type belongs to one
+tier (`location_categories.level`):
 
-| Level | Meaning | Examples |
-| --- | --- | --- |
-| 1 | Campus | Campus |
-| 2 | Building or grounds | Building, Sports Field, Gate, Covered Court, Parking |
-| 3 | Floor or wing | Floor, Wing |
-| 4 | Room or area | Room, Classroom, CR (Comfort Room), Clinic, Canteen, Library |
+| Tier | `level` | Goes inside | Example types |
+| --- | --- | --- | --- |
+| Campus (overall) | 1 | Top of the tree only | Campus |
+| Building (1st level) | 2 | A campus | Building |
+| Floor or wing (2nd level) | 3 | A building | Floor |
+| Room (3rd level) | 4 | A floor or wing | Room, Classroom, Laboratory, Library, Office, Clinic, Canteen, CR (Comfort Room) |
+| Other location | 5 | A campus, building, or floor | Gate, Parking, Sports Field, Covered Court, Garden, Corridor, Lobby |
 
-Rules, enforced by the database (`validate_location`):
+Rules, enforced by the database (`validate_location`, using `location_fits()`, migration `0005`):
 
-- Only a level-1 type can be at the top of the tree.
-- A place must have a higher level than the place it sits in. A room can go inside a floor, a
-  building, or the campus; a building cannot go inside a room.
+- Only a campus can be at the top of the tree.
+- Each tier goes exactly one level below the one before: buildings in a campus, floors in a
+  building, rooms in a floor. A single-storey building still has one floor (for example
+  "Ground Floor").
+- Other locations can go inside a campus, building, or floor. Nothing goes inside a room or an
+  other location.
+- Changing a place's type is refused if the places already inside it would no longer fit.
 - Names are unique under the same parent, and codes are unique in the school.
 - A place with active places inside it cannot be archived. A place cannot be added to, moved
   into, or restored under an archived place.
@@ -202,8 +208,8 @@ sit on a surface chip so they stay readable at any intensity.
 
 ### Location types
 
-Admins add, rename, and turn off types, and choose each type's level and environment (indoor,
-outdoor, or either). A type's level cannot change while active places use it
+Admins add, rename, and turn off types, and choose each type's tier and environment (indoor,
+outdoor, or either). A type's tier cannot change while active places use it
 (`validate_location_category`).
 
 ### User types

@@ -3,14 +3,17 @@ import { loadSetup, saveLocation, saveLocationType, saveUserType, setLocationSta
 import { FEATURE_GROUPS, allowedFeatures, defaultFeatures, type Feature } from '../lib/features';
 import type { Environment, Location, LocationType, Profile, SetupLocation, UserType } from '../lib/types';
 import { LayoutEditor } from './LayoutEditor';
+import { locationFits } from '../lib/layout';
 import { ROLE_ORDER, roleDetails, type Role } from '../roles';
 
-const LEVELS: Record<number, { label: string; icon: string }> = {
-  1: { label: 'Campus', icon: '🏫' },
-  2: { label: 'Building or grounds', icon: '🏢' },
-  3: { label: 'Floor or wing', icon: '🧱' },
-  4: { label: 'Room or area', icon: '🚪' },
+const LEVELS: Record<number, { label: string; tier: string; icon: string }> = {
+  1: { label: 'Campus', tier: 'Overall', icon: '🏫' },
+  2: { label: 'Building', tier: '1st level', icon: '🏢' },
+  3: { label: 'Floor or wing', tier: '2nd level', icon: '🧱' },
+  4: { label: 'Room', tier: '3rd level', icon: '🚪' },
+  5: { label: 'Other location', tier: 'Inside a campus, building, or floor', icon: '📍' },
 };
+const TIERS = [1, 2, 3, 4, 5];
 
 type Section = 'locations' | 'layout' | 'types' | 'userTypes';
 
@@ -95,7 +98,6 @@ function LocationsSetup({ profile, data, onChanged }: { profile: Profile; data: 
   }
   const sortNodes = (list: SetupLocation[]) => [...list].sort((a, b) => levelOf(a) - levelOf(b) || a.name.localeCompare(b.name));
   const activeChildren = (id: string) => data.locations.some((l) => l.parent_id === id && l.status !== 'archived');
-  const maxLevel = Math.max(0, ...data.types.filter((t) => t.is_active).map((t) => t.level));
 
   async function changeStatus(l: SetupLocation, status: 'active' | 'archived') {
     setBusy(l.id);
@@ -143,7 +145,7 @@ function LocationsSetup({ profile, data, onChanged }: { profile: Profile; data: 
             </small>
           </span>
           <span className="tree-actions">
-            {!archived && level < maxLevel && (
+            {!archived && data.types.some((t) => t.is_active && locationFits(t.level, level)) && (
               <button type="button" className="action-small" onClick={() => setEditor({ mode: 'add', parent: l })}>
                 + Inside
               </button>
@@ -215,7 +217,7 @@ function LocationsSetup({ profile, data, onChanged }: { profile: Profile; data: 
 }
 
 function LocationForm({ profile, types, parent, parentLevel, location, onDone }: { profile: Profile; types: LocationType[]; parent: SetupLocation | null; parentLevel: number; location?: SetupLocation; onDone: (saved: boolean) => void }) {
-  const choices = types.filter((t) => (t.is_active || t.id === location?.category_id) && (parent ? t.level > parentLevel : t.level === 1));
+  const choices = types.filter((t) => (t.is_active || t.id === location?.category_id) && locationFits(t.level, parent ? parentLevel : null));
   const [name, setName] = useState(location?.name ?? '');
   const [code, setCode] = useState(location?.code ?? '');
   const [typeId, setTypeId] = useState(choices.find((t) => t.id === location?.category_id)?.id ?? choices[0]?.id ?? '');
@@ -239,7 +241,7 @@ function LocationForm({ profile, types, parent, parentLevel, location, onDone }:
   if (!choices.length) {
     return (
       <div className="setup-form">
-        <p className="empty-note">No location type fits here. Add one in Location types with a level below {LEVELS[parentLevel]?.label ?? 'the parent'}.</p>
+        <p className="empty-note">Nothing can go inside {parent?.name ?? 'here'}. Rooms and other locations hold no places.</p>
         <button type="button" className="action-small" onClick={() => onDone(false)}>
           Close
         </button>
@@ -258,7 +260,7 @@ function LocationForm({ profile, types, parent, parentLevel, location, onDone }:
         <label className="field">
           Type
           <select className="role-select" value={typeId} onChange={(e) => setTypeId(e.target.value)}>
-            {[1, 2, 3, 4].map((lvl) => {
+            {TIERS.map((lvl) => {
               const group = choices.filter((t) => t.level === lvl);
               return group.length ? (
                 <optgroup key={lvl} label={LEVELS[lvl].label}>
@@ -312,19 +314,19 @@ function LocationTypesSetup({ profile, data, onChanged }: { profile: Profile; da
       <div className="setup-head">
         <div>
           <h2 className="section-title">Location types</h2>
-          <p className="empty-note">The level decides what can go inside what: a campus holds buildings and grounds, buildings hold floors, floors hold rooms and areas.</p>
+          <p className="empty-note">Campus › Building › Floor or wing › Room. Other locations (gates, fields, corridors, parking) can go inside a campus, building, or floor.</p>
         </div>
         <button type="button" className="action-small primary" onClick={() => setEditing('new')}>
           + Add type
         </button>
       </div>
       {editing === 'new' && <LocationTypeForm profile={profile} onDone={async (saved) => { setEditing(null); if (saved) await onChanged(); }} />}
-      {[1, 2, 3, 4].map((lvl) => {
+      {TIERS.map((lvl) => {
         const group = data.types.filter((t) => t.level === lvl);
         return (
           <div key={lvl} className="type-group">
             <h3>
-              <span aria-hidden="true">{LEVELS[lvl].icon}</span> Level {lvl} · {LEVELS[lvl].label}
+              <span aria-hidden="true">{LEVELS[lvl].icon}</span> {LEVELS[lvl].label} · {LEVELS[lvl].tier}
             </h3>
             {group.length === 0 ? (
               <p className="empty-note">No types at this level.</p>
@@ -386,9 +388,9 @@ function LocationTypeForm({ profile, type, inUse = false, onDone }: { profile: P
         <label className="field">
           Level
           <select className="role-select" value={level} disabled={inUse} onChange={(e) => setLevel(Number(e.target.value))}>
-            {[1, 2, 3, 4].map((l) => (
+            {TIERS.map((l) => (
               <option key={l} value={l}>
-                {l} · {LEVELS[l].label}
+                {LEVELS[l].label} ({LEVELS[l].tier})
               </option>
             ))}
           </select>

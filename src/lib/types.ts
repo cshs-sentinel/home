@@ -44,7 +44,7 @@ export type SetupLocation = Location & {
 export type LocationType = {
   id: string;
   name: string;
-  level: 1 | 2 | 3 | 4;
+  level: 1 | 2 | 3 | 4 | 5;
   environment: 'indoor' | 'outdoor' | 'either';
   is_active: boolean;
 };

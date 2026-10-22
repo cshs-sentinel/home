@@ -56,3 +56,11 @@ export function blockStyle(b: Block, cols: number, rows: number) {
     height: `${(b.h / rows) * 100}%`,
   };
 }
+
+// Mirrors public.location_fits(): Campus > Building > Floor or wing > Room,
+// and other locations (level 5) inside a campus, building, or floor.
+export function locationFits(childLevel: number, parentLevel: number | null): boolean {
+  if (parentLevel === null) return childLevel === 1;
+  if (childLevel === 5) return parentLevel >= 1 && parentLevel <= 3;
+  return parentLevel < 5 && childLevel === parentLevel + 1;
+}
