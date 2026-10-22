@@ -5,13 +5,40 @@ export type Profile = {
   role: Role;
   display_name: string | null;
   school_id: string | null;
+  user_type_id: string | null;
 };
+
+export type UserType = {
+  id: string;
+  name: string;
+  description: string | null;
+  base_role: Role;
+  features: string[];
+  is_active: boolean;
+  is_system: boolean;
+};
+
+export type Environment = 'indoor' | 'outdoor' | 'covered';
 
 export type Location = {
   id: string;
   name: string;
-  environment: 'indoor' | 'outdoor' | 'covered';
+  environment: Environment;
   parent_id: string | null;
+};
+
+export type SetupLocation = Location & {
+  category_id: string;
+  code: string | null;
+  status: 'active' | 'inactive' | 'archived';
+};
+
+export type LocationType = {
+  id: string;
+  name: string;
+  level: 1 | 2 | 3 | 4;
+  environment: 'indoor' | 'outdoor' | 'either';
+  is_active: boolean;
 };
 
 export type SubmissionKind = 'sentiment' | 'incident_hazard' | 'observation';

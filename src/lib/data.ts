@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from './supabase';
-import type { Alert, AuditEntry, CheckIn, Incident, Location, Profile, Submission, SubmissionKind } from './types';
+import type { Alert, AuditEntry, CheckIn, Environment, Incident, Location, LocationType, Profile, SetupLocation, Submission, SubmissionKind, UserType } from './types';
 import { fetchEarthquakes, fetchWeather, schoolCoordinates, type Quake, type WeatherSnapshot } from './weather';
 import type { Role } from '../roles';
 
@@ -16,11 +16,12 @@ export type SchoolData = {
   checkIns: CheckIn[];
   alerts: Alert[];
   people: Profile[];
+  userTypes: UserType[];
   audit: AuditEntry[];
   counts: Record<string, number | string> | null;
 };
 
-const EMPTY: SchoolData = { locations: [], submissions: [], incidents: [], checkIns: [], alerts: [], people: [], audit: [], counts: null };
+const EMPTY: SchoolData = { locations: [], submissions: [], incidents: [], checkIns: [], alerts: [], people: [], userTypes: [], audit: [], counts: null };
 
 export function useSchoolData(profile: Profile) {
   const [data, setData] = useState<SchoolData>(EMPTY);
@@ -34,7 +35,7 @@ export function useSchoolData(profile: Profile) {
     const readsSubmissions = READS_SUBMISSIONS.includes(profile.role);
     const managesPeople = MANAGES_PEOPLE.includes(profile.role);
 
-    const [locations, submissions, incidents, checkIns, alerts, people, audit, counts] = await Promise.all([
+    const [locations, submissions, incidents, checkIns, alerts, people, userTypes, audit, counts] = await Promise.all([
       supabase.from('locations').select('id, name, environment, parent_id').eq('status', 'active').order('name'),
       readsSubmissions
         ? supabase
@@ -62,7 +63,10 @@ export function useSchoolData(profile: Profile) {
         .order('created_at', { ascending: false })
         .limit(100),
       managesPeople
-        ? supabase.from('profiles').select('id, role, display_name, school_id').order('display_name')
+        ? supabase.from('profiles').select('id, role, display_name, school_id, user_type_id').order('display_name')
+        : Promise.resolve({ data: [], error: null }),
+      managesPeople
+        ? supabase.from('user_types').select('id, name, description, base_role, features, is_active, is_system').order('name')
         : Promise.resolve({ data: [], error: null }),
       managesPeople
         ? supabase.from('audit_logs').select('id, action, entity_type, created_at').order('created_at', { ascending: false }).limit(40)
@@ -70,7 +74,7 @@ export function useSchoolData(profile: Profile) {
       profile.role === 'school_admin' ? supabase.rpc('dashboard_counts') : Promise.resolve({ data: null, error: null }),
     ]);
 
-    const firstError = [locations, submissions, incidents, checkIns, alerts, people, audit, counts].find((r) => r.error)?.error;
+    const firstError = [locations, submissions, incidents, checkIns, alerts, people, userTypes, audit, counts].find((r) => r.error)?.error;
     if (firstError) setError(firstError.message);
 
     setData({
@@ -80,6 +84,7 @@ export function useSchoolData(profile: Profile) {
       checkIns: (checkIns.data ?? []) as CheckIn[],
       alerts: (alerts.data ?? []) as Alert[],
       people: (people.data ?? []) as Profile[],
+      userTypes: (userTypes.data ?? []) as UserType[],
       audit: (audit.data ?? []) as AuditEntry[],
       counts: (counts.data ?? null) as SchoolData['counts'],
     });
@@ -136,6 +141,7 @@ function toResult(error: { message: string } | null): Result {
 function friendlyError(message: string): string {
   if (message.includes('already have an open incident')) return 'You already reported an incident a few minutes ago. Responders have it. Please wait before sending another.';
   if (message.includes('row-level security')) return 'Your role is not allowed to do that.';
+  if (message.includes('user_types_school_name_key')) return 'A user type with that name already exists.';
   return message;
 }
 
@@ -202,7 +208,66 @@ export async function alertAction(id: string, action: 'approve_alert' | 'publish
   return toResult(error);
 }
 
-export async function setUserRole(userId: string, role: Role): Promise<Result> {
-  const { error } = await supabase.rpc('admin_set_user_role', { target_user_id: userId, new_role: role });
+export async function setUserType(userId: string, typeId: string): Promise<Result> {
+  const { error } = await supabase.rpc('admin_set_user_type', { target_user_id: userId, new_type_id: typeId });
+  return toResult(error);
+}
+
+// --- School setup (System Admin) ---
+
+export type SetupData = { locations: SetupLocation[]; types: LocationType[]; userTypes: UserType[] };
+
+export async function loadSetup(): Promise<{ data: SetupData; error: string | null }> {
+  const [locations, types, userTypes] = await Promise.all([
+    supabase.from('locations').select('id, name, environment, parent_id, category_id, code, status').order('name').limit(5000),
+    supabase.from('location_categories').select('id, name, level, environment, is_active').order('level').order('name'),
+    supabase.from('user_types').select('id, name, description, base_role, features, is_active, is_system').order('name'),
+  ]);
+  const error = [locations, types, userTypes].find((r) => r.error)?.error?.message ?? null;
+  return {
+    data: {
+      locations: (locations.data ?? []) as SetupLocation[],
+      types: (types.data ?? []) as LocationType[],
+      userTypes: (userTypes.data ?? []) as UserType[],
+    },
+    error: error ? friendlyError(error) : null,
+  };
+}
+
+export async function saveLocation(
+  profile: Profile,
+  input: { id?: string; name: string; parentId: string | null; categoryId: string; environment: Environment; code: string | null },
+): Promise<Result> {
+  const row = { name: input.name.trim(), parent_id: input.parentId, category_id: input.categoryId, environment: input.environment, code: input.code?.trim() || null };
+  const { error } = input.id
+    ? await supabase.from('locations').update(row).eq('id', input.id)
+    : await supabase.from('locations').insert({ ...row, school_id: profile.school_id });
+  return toResult(error);
+}
+
+export async function setLocationStatus(id: string, status: 'active' | 'archived'): Promise<Result> {
+  const { error } = await supabase.from('locations').update({ status }).eq('id', id);
+  return toResult(error);
+}
+
+export async function saveLocationType(
+  profile: Profile,
+  input: { id?: string; name: string; level: number; environment: string; isActive: boolean },
+): Promise<Result> {
+  const row = { name: input.name.trim(), level: input.level, environment: input.environment, is_active: input.isActive };
+  const { error } = input.id
+    ? await supabase.from('location_categories').update(row).eq('id', input.id)
+    : await supabase.from('location_categories').insert({ ...row, school_id: profile.school_id });
+  return toResult(error);
+}
+
+export async function saveUserType(
+  profile: Profile,
+  input: { id?: string; name: string; description: string; baseRole: Role; features: string[]; isActive: boolean },
+): Promise<Result> {
+  const row = { name: input.name.trim(), description: input.description.trim() || null, base_role: input.baseRole, features: input.features, is_active: input.isActive };
+  const { error } = input.id
+    ? await supabase.from('user_types').update(row).eq('id', input.id)
+    : await supabase.from('user_types').insert({ ...row, school_id: profile.school_id });
   return toResult(error);
 }

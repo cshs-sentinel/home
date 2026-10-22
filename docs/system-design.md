@@ -2,7 +2,7 @@
 
 Status as of 2026-10-22. Describes the frontend in this repo and the live Supabase project
 (`cshs-sentinel's Project`, region `ap-southeast-1`, Postgres 17). Where this document and the
-repo's migrations disagree, the live database is authoritative (see [Known gaps](#11-known-gaps)).
+repo's migrations disagree, the live database is authoritative (see [Known gaps](#12-known-gaps)).
 
 ## 1. Purpose
 
@@ -61,13 +61,15 @@ flowchart LR
 
 | Component | Location | Responsibility |
 | --- | --- | --- |
-| App shell | `src/App.tsx` | Login, greeting, alert banner, role tabs (bottom bar on phones) |
-| Role catalog | `src/roles.ts` | The 8 roles, their labels, and which tabs each sees |
+| App shell | `src/App.tsx` | Login, greeting, alert banner, menus built from the user type (bottom bar on phones) |
+| Role catalog | `src/roles.ts` | The 8 base roles and their labels |
+| Feature catalog | `src/lib/features.ts` | Features, the most each base role can have, defaults, and menu order |
+| Setup | `src/components/SetupPanel.tsx` | Locations tree, location types, user types |
 | Reporting | `src/components/ReportPanel.tsx` | Button-only flows: help, safe, feelings, hazard, incident, suggestion |
 | Insights | `src/components/InsightsPanel.tsx` | Decision cards, KPIs, and charts per role |
 | Queue | `src/components/QueuePanel.tsx` | Help requests, incident workflow, report review |
 | Alerts | `src/components/AlertsPanel.tsx` | Weather, published alerts, drafting, approval |
-| People | `src/components/PeoplePanel.tsx` | Role changes and the audit log |
+| People | `src/components/PeoplePanel.tsx` | Assign user types and view the audit log |
 | Charts | `src/components/Charts.tsx` | Stat tiles, bar lists, column and line charts with table views |
 | Weather panel | `src/components/WeatherPanel.tsx` | Current heat index, today's peak, 14-day history |
 | Value catalog | `src/lib/catalog.ts` | Button options that match the database CHECK constraints |
@@ -77,7 +79,7 @@ flowchart LR
 | Theme | `src/theme.ts` | Light, Dark, and Neon themes |
 | Demo accounts | `scripts/seed-sample-accounts.mjs` | One login per role |
 | Demo activity | `scripts/seed-demo-activity.mjs` | 14 days of synthetic, tagged activity; `--clean` removes it |
-| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval |
+| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types |
 
 ## 4. Data model
 
@@ -85,13 +87,15 @@ All tables are in `public`, have RLS enabled, and are scoped by `school_id`.
 
 | Table | Holds | Values the app uses |
 | --- | --- | --- |
-| `profiles` | One row per user: `role`, `school_id`, `is_active` | 8 `app_role` values |
+| `profiles` | One row per user: `role`, `user_type_id`, `school_id`, `is_active` | 8 `app_role` values |
+| `user_types` | Admin-defined user types per school | `base_role`, `features`, `is_active`, `is_system` for the 8 built-in types |
 | `submissions` | Feelings, hazards, and observations | `kind`: `sentiment` (sub-types joy, calm, worried, stressed, sad, angry, lonely, hopeless; plus `stress_level` 1–5), `incident_hazard` (unsafe_condition, bullying, suspicious_activity), `observation` (safety_concern, report, suggestion). Status new → acknowledged → resolved |
 | `check_ins` | Location check-ins | `status`: `safe` or `need_help` |
 | `incidents` | Cases with a generated `case_ref` (`SNT-YYYY-NNNN`) | Category: emergency, medical, security, other. Status new → acknowledged → assigned → in_progress → resolved → closed, or cancelled |
 | `incident_notifications` | One row per new incident, created by a trigger | Read by reviewers |
 | `alerts` | Announcements | Severity info, advisory, urgent. Target everyone, responders, or one role. Status draft → approved → published, or cancelled / corrected |
-| `locations` | Buildings, floors, rooms, open spaces | Active locations become the place buttons |
+| `location_categories` | Location types, such as Building, Room, or CR | `level` 1–4 and `environment` |
+| `locations` | The campus tree, from campus to rooms and areas | `parent_id`, `category_id`, `status`. Active locations become the place buttons |
 | `weather_observations` | Stored weather readings | Not used by the app yet (see gaps) |
 | `audit_logs` | Role changes, alert workflow, and other changes to sensitive data | Read by school and system admins |
 
@@ -106,7 +110,10 @@ Database rules the app depends on:
 
 ## 5. Roles
 
-| Role | Tabs | What they can do |
+These are the 8 base roles and the menus their built-in user types get. A System Admin can create
+other user types on top of these roles (see [School setup](#6-school-setup)).
+
+| Role | Default menus | What they can do |
 | --- | --- | --- |
 | Student | Report, Alerts | Send help requests, check-ins, feelings, hazards, incidents, suggestions. Track their own incidents and check-ins. See alerts and weather. |
 | Teacher | Report, Insights, Queue, Alerts | Everything a student can do. Review and resolve non-confidential reports. See report trends, hotspots, and bullying counts. |
@@ -115,7 +122,7 @@ Database rules the app depends on:
 | DRRM Coordinator | Insights, Queue, Alerts, Report | Same as Security, plus drafting alerts. Weather and hazard insights offer a one-tap draft. |
 | Guidance Counselor | Insights, Queue, Report, Alerts | The only role that reads individual feelings. Wellbeing analytics, follow-up queue, stress trends. |
 | School Admin | Insights, Queue, Alerts, People, Report | Everything responders see, approving, publishing, and withdrawing alerts, changing roles, and the audit log. Sees only a **count** of open wellbeing reports. |
-| System Admin | People, Report | Change roles (including System Admin) and read the audit log. No access to reports, incidents, or alerts. |
+| System Admin | Setup, People, Report | Configure the campus and places, location types, and user types. Assign user types (including System Admin) and read the audit log. No access to reports, incidents, or wellbeing data. |
 
 Enforcement:
 
@@ -125,11 +132,79 @@ Enforcement:
   by `kind <> 'sentiment'`.
 - Guidance reads and reviews all submissions, including feelings.
 - `dashboard_counts()` gives School Admin the number of open wellbeing reports without the rows.
-- `admin_set_user_role()` lets School and System Admins change roles in their school. Admins
-  cannot change their own role, and only a System Admin can grant System Admin. Each change is
-  written to the audit log.
+- `admin_set_user_type()` lets School and System Admins assign a user type in their school. It
+  sets the person's base role to the type's base role. Admins cannot change their own type, and
+  only a System Admin can assign or change a System Admin. Each change is written to the audit
+  log. `admin_set_user_role()` still works and also moves the person to that role's built-in type.
 
-## 6. Reporting (mobile-first, buttons only)
+## 6. School setup
+
+The System Admin's **Setup** menu has three sections.
+
+### Locations
+
+The campus is a tree of places. Each place has a location type, and each type has a level:
+
+| Level | Meaning | Examples |
+| --- | --- | --- |
+| 1 | Campus | Campus |
+| 2 | Building or grounds | Building, Sports Field, Gate, Covered Court, Parking |
+| 3 | Floor or wing | Floor, Wing |
+| 4 | Room or area | Room, Classroom, CR (Comfort Room), Clinic, Canteen, Library |
+
+Rules, enforced by the database (`validate_location`):
+
+- Only a level-1 type can be at the top of the tree.
+- A place must have a higher level than the place it sits in. A room can go inside a floor, a
+  building, or the campus; a building cannot go inside a room.
+- Names are unique under the same parent, and codes are unique in the school.
+- A place with active places inside it cannot be archived. A place cannot be added to, moved
+  into, or restored under an archived place.
+- Places are archived, not deleted, so past reports keep their location.
+
+In the app the admin taps **+ Add campus**, then **+ Inside** on any place. The form only offers
+types that fit at that spot.
+
+### Location types
+
+Admins add, rename, and turn off types, and choose each type's level and environment (indoor,
+outdoor, or either). A type's level cannot change while active places use it
+(`validate_location_category`).
+
+### User types
+
+A user type has a name, an optional description, a **base role**, and a set of **features**.
+
+- The base role decides what the database allows: which rows the person can read and write. RLS
+  is unchanged and keeps the confidentiality rules (only Guidance reads individual feelings).
+- Features decide what the person sees: the menus and each report button.
+- A type can never have a feature its base role does not allow. The database rejects it
+  (`validate_user_type`, using `role_feature_ceiling()`), and the app greys those features out.
+- Each school has 8 built-in types, one per base role. They cannot be turned off or change base
+  role, but their features can be edited.
+- A type's base role cannot change, and the type cannot be turned off, while people have it.
+
+Features:
+
+| Feature | Shows | Allowed base roles |
+| --- | --- | --- |
+| `report.help`, `report.safe`, `report.feeling`, `report.hazard`, `report.incident`, `report.observation` | The six report buttons | All |
+| `alerts.view` | Alerts menu (weather and published alerts) | All |
+| `insights.view`, `queue.view` | Insights and Queue menus | Teacher, Security, DRRM, Guidance, School Admin |
+| `alerts.draft` | Drafting alerts | DRRM, School Admin |
+| `alerts.approve` | Approving, publishing, withdrawing alerts | School Admin |
+| `people.manage` | People menu | School Admin, System Admin |
+| `setup.locations` | Setup: locations and location types | School Admin, System Admin |
+| `setup.user_types` | Setup: user types | System Admin |
+
+Example: **Canteen Staff**, base role Non-Teaching Staff, with I need help, I'm safe, Report a
+hazard, Report an incident, and Alerts. Canteen staff see only those 4 report buttons and the
+Alerts menu.
+
+Turning a feature off hides it in the app. The base role is still the security boundary: a person
+whose base role allows an action can technically still perform it through the API.
+
+## 7. Reporting (mobile-first, buttons only)
 
 The Report tab opens with six large buttons:
 
@@ -146,7 +221,7 @@ Every place step has a Skip button. Each flow ends with a summary, a single larg
 a short note on who can see the report. On phones, tap targets are at least 48 px, choices use
 a 2-column grid, and the role tabs sit in a bottom bar.
 
-## 7. Analytics and decision support
+## 8. Analytics and decision support
 
 Insights are computed in the browser from the rows each role can read: the last 60 days of
 submissions and incidents, check-ins, and the weather and earthquake feeds. A time filter
@@ -193,7 +268,7 @@ theme, checked with the dataviz palette validator against each theme's surface.
    everyone.
 3. School Admin can withdraw a published alert. The author or an Admin can cancel a draft.
 
-## 8. External data
+## 9. External data
 
 | Source | Data | Refresh |
 | --- | --- | --- |
@@ -207,7 +282,7 @@ extreme caution, 42–51 danger, 52 and above extreme danger.
 The school location comes from `VITE_SCHOOL_LAT`, `VITE_SCHOOL_LON`, and `VITE_SCHOOL_PLACE`.
 If they are not set, Manila is used, and the UI says so.
 
-## 9. Security model
+## 10. Security model
 
 - The browser uses only the publishable key. RLS and workflow functions guard every read and write.
 - The service role key is used only by local seed scripts and is never bundled.
@@ -218,7 +293,7 @@ If they are not set, Manila is used, and the UI says so.
 - Helper functions use `SECURITY DEFINER` with an empty `search_path`.
 - Role changes and the alert workflow are written to `audit_logs`.
 
-## 10. Deployment
+## 11. Deployment
 
 | Item | Value |
 | --- | --- |
@@ -231,7 +306,7 @@ If they are not set, Manila is used, and the UI says so.
 There is one environment. The live project is also where the demo school, demo accounts, and
 demo activity live.
 
-## 11. Known gaps
+## 12. Known gaps
 
 1. **Migration drift.** `0001` describes a 4-role model that is not in the live database. The live
    schema was built outside this repo's migrations. Run `supabase db pull` to bring the history in
@@ -252,6 +327,11 @@ demo activity live.
 8. **Demo data is synthetic.** The demo school's analytics come from
    `seed-demo-activity.mjs`. Remove it with `--clean` before using real data.
 9. **No automated tests**, no password reset, and no self-service sign-up.
-10. **Credentials.** `.env` values appeared in a working session's logs. Rotate the Supabase
+10. **Features are not enforced by the database.** Turning a feature off hides it in the app, but
+    the base role still allows the action through the API. Enforcing report features in the
+    insert policies would close this.
+11. **No school or campus assignment for new accounts.** New sign-ups get the Student role and no
+    school. There is no screen yet to place an account in a school.
+12. **Credentials.** `.env` values appeared in a working session's logs. Rotate the Supabase
     management token, service role key, database password, Cloudflare token, and the GitHub token
     that was shared in chat.

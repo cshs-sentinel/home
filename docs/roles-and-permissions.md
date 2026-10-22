@@ -47,16 +47,25 @@ audit log.
 
 ## System Admin
 
-Scoped technical administration. This role can change roles (including granting System Admin)
-and read the audit log. It intentionally does not have Guidance's confidential-content access or
-School Admin's incident, alert, and location management rights.
+The school's setup administrator. This role configures the campus tree (campus, buildings,
+floors, rooms, CRs, and other areas), the location types, and the user types, and assigns user
+types to people. It can grant System Admin. It intentionally does not have Guidance's
+confidential-content access or School Admin's incident and alert rights.
+
+## User types
+
+These 8 roles are the **base roles**. A System Admin can create any number of user types on top
+of them, such as "Canteen Staff" on Non-Teaching Staff or "School Nurse" on Guidance Counselor, and
+choose which menus and report buttons each type gets. A user type can never get more than its
+base role allows. See [system-design.md](system-design.md#6-school-setup).
 
 ## Notes for contributors
 
-- Roles are changed in the app's People tab, which calls `admin_set_user_role()`. School and
-  System Admins can change roles in their own school, cannot change their own role, and only a
-  System Admin can grant System Admin. Every change is written to `audit_logs`. There is no
-  separate `user_roles` table in the live schema, unlike an earlier draft of this repo's migration.
+- People are assigned a user type in the app's People tab, which calls `admin_set_user_type()`.
+  That also sets their base role. School and System Admins can do this in their own school,
+  cannot change their own type, and only a System Admin can assign or change a System Admin.
+  Every change is written to `audit_logs`. There is no separate `user_roles` table in the live
+  schema, unlike an earlier draft of this repo's migration.
 - See [system-design.md](system-design.md) for the features and insights each role gets.
 - `scripts/seed-sample-accounts.mjs` creates one demo login per role (see the project README) so
   every role above can be signed into and previewed without touching real accounts.

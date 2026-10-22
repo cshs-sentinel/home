@@ -3,6 +3,7 @@ import { EMOTIONS, HAZARDS, INCIDENTS, OBSERVATIONS, STRESS_LEVELS, iconFor, lab
 import { checkIn, raiseIncident, sendSubmission, transitionIncident } from '../lib/data';
 import { locationName, OPEN_INCIDENT } from '../lib/analytics';
 import type { CheckIn, Incident, Location, Profile } from '../lib/types';
+import type { Feature } from '../lib/features';
 
 type Flow = 'feel' | 'hazard' | 'incident' | 'observation' | 'safe' | 'help';
 type Step = 'choice' | 'stress' | 'location' | 'review';
@@ -16,6 +17,15 @@ const FLOWS: { flow: Flow; label: string; hint: string; icon: string; tone: stri
   { flow: 'observation', label: 'Suggest or observe', hint: 'Ideas and concerns', icon: '💡', tone: 'calm' },
 ];
 
+const FLOW_FEATURE: Record<Flow, Feature> = {
+  help: 'report.help',
+  safe: 'report.safe',
+  feel: 'report.feeling',
+  hazard: 'report.hazard',
+  incident: 'report.incident',
+  observation: 'report.observation',
+};
+
 const CHOICES: Partial<Record<Flow, { title: string; options: Option[] }>> = {
   feel: { title: 'How are you feeling right now?', options: EMOTIONS },
   hazard: { title: 'What did you see?', options: HAZARDS },
@@ -25,13 +35,15 @@ const CHOICES: Partial<Record<Flow, { title: string; options: Option[] }>> = {
 
 type Props = {
   profile: Profile;
+  features: Set<Feature>;
   locations: Location[];
   incidents: Incident[];
   checkIns: CheckIn[];
   onSent: () => void;
 };
 
-export function ReportPanel({ profile, locations, incidents, checkIns, onSent }: Props) {
+export function ReportPanel({ profile, features, locations, incidents, checkIns, onSent }: Props) {
+  const flows = FLOWS.filter((f) => features.has(FLOW_FEATURE[f.flow]));
   const [flow, setFlow] = useState<Flow | null>(null);
   const [step, setStep] = useState<Step>('choice');
   const [choice, setChoice] = useState<string | null>(null);
@@ -242,7 +254,7 @@ export function ReportPanel({ profile, locations, incidents, checkIns, onSent }:
     <section className="report-home">
       <h2 className="section-title">What do you want to do?</h2>
       <div className="action-grid">
-        {FLOWS.map((f) => (
+        {flows.map((f) => (
           <button type="button" key={f.flow} className={`action-button tone-${f.tone}`} onClick={() => start(f.flow)}>
             <span className="action-icon" aria-hidden="true">{f.icon}</span>
             <span className="action-label">{f.label}</span>

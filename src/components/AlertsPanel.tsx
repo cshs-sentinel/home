@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ALERT_TEMPLATES, type AlertTemplate } from '../lib/analytics';
 import { alertAction, draftAlert, type SchoolData } from '../lib/data';
 import type { Alert, Profile } from '../lib/types';
+import type { Feature } from '../lib/features';
 import type { Quake, WeatherSnapshot } from '../lib/weather';
 import { ROLE_ORDER, roleDetails, type Role } from '../roles';
 import { WeatherPanel } from './WeatherPanel';
@@ -19,6 +20,7 @@ const SEVERITY_ICON: Record<Alert['severity'], string> = { info: 'ℹ️', advis
 
 type Props = {
   profile: Profile;
+  features: Set<Feature>;
   data: SchoolData;
   weather: WeatherSnapshot | null;
   quakes: Quake[];
@@ -27,9 +29,9 @@ type Props = {
   onChanged: () => Promise<void>;
 };
 
-export function AlertsPanel({ profile, data, weather, quakes, weatherError, initialTemplate, onChanged }: Props) {
-  const canDraft = profile.role === 'drrm' || profile.role === 'school_admin';
-  const isAdmin = profile.role === 'school_admin';
+export function AlertsPanel({ profile, features, data, weather, quakes, weatherError, initialTemplate, onChanged }: Props) {
+  const canDraft = features.has('alerts.draft');
+  const isAdmin = features.has('alerts.approve');
   const published = data.alerts.filter((a) => a.status === 'published');
   const pending = data.alerts.filter((a) => a.status === 'draft' || a.status === 'approved');
   const [busy, setBusy] = useState<string | null>(null);

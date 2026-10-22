@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { roleDetails, TAB_LABELS, type Role, type Tab } from './roles';
 import demoAccounts from './demo-accounts.json';
 import { THEME_LABELS, useTheme } from './theme';
-import type { Profile } from './lib/types';
+import type { Profile, UserType } from './lib/types';
 import { useExternalData, useSchoolData } from './lib/data';
 import type { AlertTemplate } from './lib/analytics';
 import { ReportPanel } from './components/ReportPanel';
@@ -12,11 +12,14 @@ import { InsightsPanel } from './components/InsightsPanel';
 import { QueuePanel } from './components/QueuePanel';
 import { AlertsPanel } from './components/AlertsPanel';
 import { PeoplePanel } from './components/PeoplePanel';
+import { SetupPanel } from './components/SetupPanel';
+import { effectiveFeatures, tabsFor } from './lib/features';
 
 function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [schoolName, setSchoolName] = useState<string | null>(null);
+  const [userType, setUserType] = useState<UserType | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready'>('loading');
 
   useEffect(() => {
@@ -33,13 +36,14 @@ function useAuth() {
     if (!userId) {
       setProfile(null);
       setSchoolName(null);
+      setUserType(null);
       setStatus('ready');
       return;
     }
     setStatus('loading');
     supabase
       .from('profiles')
-      .select('id, role, display_name, school_id')
+      .select('id, role, display_name, school_id, user_type_id')
       .eq('id', userId)
       .single()
       .then(async ({ data, error }) => {
@@ -49,6 +53,12 @@ function useAuth() {
           return;
         }
         setProfile(data as Profile);
+        if (data.user_type_id) {
+          const { data: type } = await supabase.from('user_types').select('id, name, description, base_role, features, is_active, is_system').eq('id', data.user_type_id).single();
+          setUserType((type as UserType | null) ?? null);
+        } else {
+          setUserType(null);
+        }
         if (data.school_id) {
           const { data: school } = await supabase.from('schools').select('name').eq('id', data.school_id).single();
           setSchoolName(school?.name ?? null);
@@ -57,7 +67,7 @@ function useAuth() {
       });
   }, [userId]);
 
-  return { session, profile, schoolName, status };
+  return { session, profile, schoolName, userType, status };
 }
 
 function LoginCard() {
@@ -117,9 +127,11 @@ function LoginCard() {
   );
 }
 
-function Workspace({ profile, schoolName, email }: { profile: Profile; schoolName: string | null; email: string }) {
+function Workspace({ profile, schoolName, email, userType }: { profile: Profile; schoolName: string | null; email: string; userType: UserType | null }) {
   const details = roleDetails[profile.role];
-  const [tab, setTab] = useState<Tab>(details.tabs[0]);
+  const features = useMemo(() => effectiveFeatures(profile.role, userType?.features ?? null), [profile.role, userType]);
+  const tabs = tabsFor(features);
+  const [tab, setTab] = useState<Tab>(tabs[0] ?? 'report');
   const [template, setTemplate] = useState<AlertTemplate | null>(null);
   const { data, loading, error, reload } = useSchoolData(profile);
   const external = useExternalData();
@@ -136,16 +148,16 @@ function Workspace({ profile, schoolName, email }: { profile: Profile; schoolNam
       <div className="greeting">
         <span className="role-symbol" aria-hidden="true">{details.icon}</span>
         <div>
-          <p className="eyebrow">{details.label.toUpperCase()}</p>
+          <p className="eyebrow">{(userType?.name ?? details.label).toUpperCase()}</p>
           <h1>Hi, {profile.display_name ?? email}</h1>
           <p className="lede">
-            {details.summary}
+            {userType?.description || details.summary}
             {schoolName ? ` · ${schoolName}` : ''}
           </p>
         </div>
       </div>
 
-      {latestAlert && (
+      {latestAlert && tabs.includes('alerts') && (
         <button type="button" className={`alert-banner sev-${latestAlert.severity}`} onClick={() => setTab('alerts')}>
           <span aria-hidden="true">{latestAlert.severity === 'urgent' ? '🚨' : '⚠️'}</span>
           <span>
@@ -155,9 +167,11 @@ function Workspace({ profile, schoolName, email }: { profile: Profile; schoolNam
         </button>
       )}
 
-      {details.tabs.length > 1 && (
+      {tabs.length === 0 && <p className="empty-note">Your account has no features turned on yet. Ask your System Admin to set up your user type.</p>}
+
+      {tabs.length > 1 && (
         <nav className="tab-bar" aria-label="Sections">
-          {details.tabs.map((t) => (
+          {tabs.map((t) => (
             <button type="button" key={t} className={`tab-button${tab === t ? ' is-active' : ''}`} aria-current={tab === t ? 'page' : undefined} onClick={() => setTab(t)}>
               <span aria-hidden="true">{TAB_LABELS[t].icon}</span>
               <span>{TAB_LABELS[t].label}</span>
@@ -168,22 +182,23 @@ function Workspace({ profile, schoolName, email }: { profile: Profile; schoolNam
 
       {error && <p className="error-text">Some data could not load: {error}</p>}
       <div className={`panel${loading ? ' is-loading' : ''}`}>
-        {tab === 'report' && <ReportPanel profile={profile} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onSent={reload} />}
-        {tab === 'insights' && (
+        {tab === 'report' && tabs.includes('report') && <ReportPanel profile={profile} features={features} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onSent={reload} />}
+        {tab === 'insights' && tabs.includes('insights') && (
           <InsightsPanel role={profile.role} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} onDraftAlert={draftFromInsight} />
         )}
-        {tab === 'queue' && <QueuePanel role={profile.role} data={data} onChanged={reload} />}
-        {tab === 'alerts' && (
-          <AlertsPanel profile={profile} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} initialTemplate={template} onChanged={reload} />
+        {tab === 'queue' && tabs.includes('queue') && <QueuePanel role={profile.role} data={data} onChanged={reload} />}
+        {tab === 'alerts' && tabs.includes('alerts') && (
+          <AlertsPanel profile={profile} features={features} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} initialTemplate={template} onChanged={reload} />
         )}
-        {tab === 'people' && <PeoplePanel profile={profile} data={data} onChanged={reload} />}
+        {tab === 'people' && tabs.includes('people') && <PeoplePanel profile={profile} data={data} onChanged={reload} />}
+        {tab === 'setup' && tabs.includes('setup') && <SetupPanel profile={profile} features={features} people={data.people} onPeopleChanged={reload} />}
       </div>
     </div>
   );
 }
 
 export function App() {
-  const { session, profile, schoolName, status } = useAuth();
+  const { session, profile, schoolName, userType, status } = useAuth();
   const { theme, cycleTheme } = useTheme();
 
   return (
@@ -212,7 +227,7 @@ export function App() {
       <section className="access">
         {status === 'loading' && <p>Loading…</p>}
         {status === 'ready' && !session && <LoginCard />}
-        {status === 'ready' && session && profile && <Workspace key={profile.id} profile={profile} schoolName={schoolName} email={session.user.email ?? ''} />}
+        {status === 'ready' && session && profile && <Workspace key={profile.id + (userType?.id ?? '')} profile={profile} userType={userType} schoolName={schoolName} email={session.user.email ?? ''} />}
         {status === 'ready' && session && !profile && <p className="error-text">Signed in, but no profile was found for this account.</p>}
       </section>
     </main>
