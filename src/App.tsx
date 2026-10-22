@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { roleDetails, type Role } from './roles';
 import demoAccounts from './demo-accounts.json';
-import { useTheme } from './theme';
+import { THEME_LABELS, useTheme } from './theme';
 
 type Profile = { role: Role; display_name: string | null; school_id: string | null };
 
@@ -148,7 +148,7 @@ function RoleDashboard({ profile, schoolName, email }: { profile: Profile; schoo
 
 export function App() {
   const { session, profile, schoolName, status } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, cycleTheme } = useTheme();
 
   return (
     <main>
@@ -157,8 +157,8 @@ export function App() {
           <span>◈</span> SENTINEL
         </a>
         <div className="header-actions">
-          <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
-            {theme === 'dark' ? '☀' : '☾'} {theme === 'dark' ? 'Light' : 'Dark'} mode
+          <button type="button" className="theme-toggle" onClick={cycleTheme} aria-label={`Theme: ${THEME_LABELS[theme]}. Switch theme`}>
+            <span aria-hidden="true">◐</span> {THEME_LABELS[theme]}
           </button>
           {session && (
             <button className="secondary" onClick={() => supabase.auth.signOut()}>

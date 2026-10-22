@@ -1,13 +1,24 @@
 import { useLayoutEffect, useState } from 'react';
 
-export type Theme = 'light' | 'dark';
+export const THEMES = ['light', 'dark', 'neon'] as const;
+export type Theme = (typeof THEMES)[number];
+
+export const THEME_LABELS: Record<Theme, string> = {
+  light: 'Light',
+  dark: 'Dark',
+  neon: 'Neon',
+};
 
 const STORAGE_KEY = 'sentinel-theme';
+
+function isTheme(value: string | null): value is Theme {
+  return value !== null && (THEMES as readonly string[]).includes(value);
+}
 
 function readInitialTheme(): Theme {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'light' || saved === 'dark') return saved;
+    if (isTheme(saved)) return saved;
   } catch {
     // Storage can be blocked (private windows, strict settings); use the system preference instead.
   }
@@ -26,6 +37,6 @@ export function useTheme() {
     }
   }, [theme]);
 
-  const toggleTheme = () => setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
-  return { theme, toggleTheme };
+  const cycleTheme = () => setTheme((current) => THEMES[(THEMES.indexOf(current) + 1) % THEMES.length]);
+  return { theme, cycleTheme };
 }
