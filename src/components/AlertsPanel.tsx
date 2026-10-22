@@ -137,7 +137,7 @@ function Composer({ profile, initialTemplate, onSaved }: { profile: Profile; ini
   const [body, setBody] = useState('');
   const [severity, setSeverity] = useState<Alert['severity']>('advisory');
   const [scope, setScope] = useState<Alert['target_scope']>('all');
-  const [targetRole, setTargetRole] = useState<Role>('student');
+  const [targetRole, setTargetRole] = useState<Role>('community');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -197,7 +197,7 @@ function Composer({ profile, initialTemplate, onSaved }: { profile: Profile; ini
       <div className="chip-row" role="group" aria-label="Audience">
         {(['all', 'responders', 'role'] as const).map((s) => (
           <button type="button" key={s} className={`filter-button${scope === s ? ' is-active' : ''}`} aria-pressed={scope === s} onClick={() => setScope(s)}>
-            {s === 'all' ? 'Everyone' : s === 'responders' ? 'Responders' : 'One role'}
+            {s === 'all' ? 'Everyone' : s === 'responders' ? 'School Admins' : 'One role'}
           </button>
         ))}
         {scope === 'role' && (
@@ -220,6 +220,6 @@ function Composer({ profile, initialTemplate, onSaved }: { profile: Profile; ini
 
 function audienceLabel(a: Alert): string {
   if (a.target_scope === 'all') return 'Everyone';
-  if (a.target_scope === 'responders') return 'Responders';
+  if (a.target_scope === 'responders') return 'School Admins';
   return a.target_role ? roleDetails[a.target_role].label : 'One role';
 }

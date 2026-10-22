@@ -26,7 +26,7 @@ if (!url || !env.SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env');
   process.exit(1);
 }
-const { schoolId, accounts } = JSON.parse(readFileSync(join(projectRoot, 'src', 'demo-accounts.json'), 'utf8'));
+const { schoolId } = JSON.parse(readFileSync(join(projectRoot, 'src', 'demo-accounts.json'), 'utf8'));
 const admin = createClient(url, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
 
 async function must(promise) {
@@ -77,8 +77,10 @@ async function seedActivity() {
     users.push(...data.users);
     if (data.users.length < 200) break;
   }
-  const idFor = (role) => users.find((u) => u.email === accounts.find((a) => a.role === role).email)?.id;
-  const reporters = ['student', 'teacher', 'non_teaching'].map(idFor).filter(Boolean);
+  // Demo accounts are looked up by email; roles are Community Member (reporters)
+  // and School Admin (responders).
+  const idFor = (key) => users.find((u) => u.email === `demo.${key}@sentinel.test`)?.id;
+  const reporters = ['student', 'teacher', 'nonteaching'].map(idFor).filter(Boolean);
   const student = idFor('student');
   const security = idFor('security');
   const guidance = idFor('guidance');

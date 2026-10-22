@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { roleDetails, TAB_LABELS, type Role, type Tab } from './roles';
 import demoAccounts from './demo-accounts.json';
 import { THEME_LABELS, useTheme } from './theme';
+import { SignUpCard } from './components/SignUpCard';
 import type { Profile, UserType } from './lib/types';
-import { useExternalData, useSchoolData, type SchoolData } from './lib/data';
-import { incidentSummary, sentimentSummary, since, type AlertTemplate } from './lib/analytics';
+import { USER_TYPE_COLUMNS, useExternalData, useSchoolData, type SchoolData } from './lib/data';
+import { incidentSummary, since, type AlertTemplate } from './lib/analytics';
 import { ReportPanel } from './components/ReportPanel';
 import { AnalyticsPanel, type Range } from './components/AnalyticsPanel';
 import { MapPanel } from './components/MapPanel';
@@ -45,7 +46,7 @@ function useAuth() {
     setStatus('loading');
     supabase
       .from('profiles')
-      .select('id, role, display_name, school_id, user_type_id')
+      .select('id, role, display_name, school_id, user_type_id, primary_location_id')
       .eq('id', userId)
       .single()
       .then(async ({ data, error }) => {
@@ -56,7 +57,7 @@ function useAuth() {
         }
         setProfile(data as Profile);
         if (data.user_type_id) {
-          const { data: type } = await supabase.from('user_types').select('id, name, description, base_role, features, is_active, is_system').eq('id', data.user_type_id).single();
+          const { data: type } = await supabase.from('user_types').select(USER_TYPE_COLUMNS).eq('id', data.user_type_id).single();
           setUserType((type as UserType | null) ?? null);
         } else {
           setUserType(null);
@@ -69,10 +70,23 @@ function useAuth() {
       });
   }, [userId]);
 
-  return { session, profile, schoolName, userType, status };
+  // Re-read the profile without showing the loading screen (for example after
+  // the default location changes).
+  const refreshProfile = useCallback(async () => {
+    if (!userId) return;
+    const { data } = await supabase.from('profiles').select('id, role, display_name, school_id, user_type_id, primary_location_id').eq('id', userId).single();
+    if (data) setProfile(data as Profile);
+  }, [userId]);
+
+  return { session, profile, schoolName, userType, status, refreshProfile };
 }
 
-function LoginCard() {
+function AuthCards() {
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  return mode === 'login' ? <LoginCard onSignUp={() => setMode('signup')} /> : <SignUpCard onLogin={() => setMode('login')} />;
+}
+
+function LoginCard({ onSignUp }: { onSignUp: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -110,16 +124,22 @@ function LoginCard() {
           {submitting ? 'Signing in…' : 'Log in'}
         </button>
       </form>
+      <button type="button" className="link-button" onClick={onSignUp}>
+        New here? Create a community account
+      </button>
       <button type="button" className="link-button" onClick={() => setShowDemo((v) => !v)}>
-        {showDemo ? 'Hide demo accounts' : 'Try a demo account for every role'}
+        {showDemo ? 'Hide demo accounts' : 'Try a demo account for each role'}
       </button>
       {showDemo && (
         <ul className="demo-accounts">
           {demoAccounts.accounts.map((account) => (
             <li key={account.email}>
-              <span>{roleDetails[account.role as Role].label}</span>
+              <span>
+                {account.displayName}
+                <small> · {roleDetails[account.role as Role].label}</small>
+              </span>
               <button type="button" onClick={() => login(account.email, demoAccounts.password)} disabled={submitting}>
-                Log in as {roleDetails[account.role as Role].label}
+                Log in
               </button>
             </li>
           ))}
@@ -129,7 +149,7 @@ function LoginCard() {
   );
 }
 
-function Workspace({ profile, schoolName, email, userType }: { profile: Profile; schoolName: string | null; email: string; userType: UserType | null }) {
+function Workspace({ profile, schoolName, email, userType, onProfileChanged }: { profile: Profile; schoolName: string | null; email: string; userType: UserType | null; onProfileChanged: () => Promise<void> }) {
   const details = roleDetails[profile.role];
   const features = useMemo(() => effectiveFeatures(profile.role, userType?.features ?? null), [profile.role, userType]);
   const nav = navFor(features);
@@ -172,7 +192,7 @@ function Workspace({ profile, schoolName, email, userType }: { profile: Profile;
         </button>
       )}
 
-      {tabs.length === 0 && <p className="empty-note">Your account has no features turned on yet. Ask your System Admin to set up your user type.</p>}
+      {tabs.length === 0 && <p className="empty-note">Your account has no features turned on yet. Ask your System Admin to set up your position.</p>}
 
       {tabs.length > 1 && (
         <nav className="tab-bar" aria-label="Sections">
@@ -189,12 +209,12 @@ function Workspace({ profile, schoolName, email, userType }: { profile: Profile;
 
       {error && <p className="error-text">Some data could not load: {error}</p>}
       <div className={`panel${loading ? ' is-loading' : ''}`}>
-        {tab === 'report' && tabs.includes('report') && <ReportPanel profile={profile} features={features} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onSent={reload} />}
+        {tab === 'report' && tabs.includes('report') && <ReportPanel profile={profile} features={features} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onSent={reload} onProfileChanged={onProfileChanged} />}
         {tab === 'map' && tabs.includes('map') && <MapPanel role={profile.role} days={days} onDays={setDays} data={data} />}
         {tab === 'analytics' && tabs.includes('analytics') && (
           <AnalyticsPanel role={profile.role} days={days} onDays={setDays} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} onDraftAlert={draftFromInsight} />
         )}
-        {tab === 'queue' && tabs.includes('queue') && <QueuePanel role={profile.role} data={data} onChanged={reload} />}
+        {tab === 'queue' && tabs.includes('queue') && <QueuePanel data={data} onChanged={reload} />}
         {tab === 'alerts' && tabs.includes('alerts') && (
           <AlertsPanel profile={profile} features={features} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} initialTemplate={template} onChanged={reload} />
         )}
@@ -206,18 +226,17 @@ function Workspace({ profile, schoolName, email, userType }: { profile: Profile;
 }
 
 // Items behind the More menu that should not wait: help requests and
-// unacknowledged incidents for responders, unresolved crisis follow-ups for Guidance.
+// unacknowledged incidents for School Admins.
 function urgentCount(role: Role, data: SchoolData): number {
-  if (role === 'security' || role === 'drrm' || role === 'school_admin') {
+  if (role === 'school_admin') {
     const help = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help').length;
     return help + incidentSummary(data.incidents).unacknowledged;
   }
-  if (role === 'guidance') return sentimentSummary(data.submissions).needsFollowUp.length;
   return 0;
 }
 
 export function App() {
-  const { session, profile, schoolName, userType, status } = useAuth();
+  const { session, profile, schoolName, userType, status, refreshProfile } = useAuth();
   const { theme, cycleTheme } = useTheme();
 
   return (
@@ -245,8 +264,8 @@ export function App() {
       )}
       <section className="access">
         {status === 'loading' && <p>Loading…</p>}
-        {status === 'ready' && !session && <LoginCard />}
-        {status === 'ready' && session && profile && <Workspace key={profile.id + (userType?.id ?? '')} profile={profile} userType={userType} schoolName={schoolName} email={session.user.email ?? ''} />}
+        {status === 'ready' && !session && <AuthCards />}
+        {status === 'ready' && session && profile && <Workspace key={profile.id + (userType?.id ?? '')} profile={profile} userType={userType} schoolName={schoolName} email={session.user.email ?? ''} onProfileChanged={refreshProfile} />}
         {status === 'ready' && session && !profile && <p className="error-text">Signed in, but no profile was found for this account.</p>}
       </section>
     </main>

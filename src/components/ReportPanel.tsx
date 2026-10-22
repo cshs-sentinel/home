@@ -5,6 +5,7 @@ import { OPEN_INCIDENT } from '../lib/analytics';
 import type { CheckIn, Incident, Location, Profile } from '../lib/types';
 import type { Feature } from '../lib/features';
 import { placeLabel } from '../lib/layout';
+import { DefaultLocationCard } from './DefaultLocationCard';
 import { PlacePicker } from './PlacePicker';
 
 type Flow = 'feel' | 'hazard' | 'incident' | 'observation' | 'safe' | 'help';
@@ -13,7 +14,7 @@ type Step = 'choice' | 'stress' | 'location' | 'review';
 const FLOWS: { flow: Flow; label: string; hint: string; icon: string; tone: string }[] = [
   { flow: 'help', label: 'I need help', hint: 'Tell responders where you are', icon: '🆘', tone: 'danger' },
   { flow: 'safe', label: "I'm safe", hint: 'Quick check-in', icon: '✅', tone: 'ok' },
-  { flow: 'feel', label: 'How I feel', hint: 'Private to Guidance', icon: '💬', tone: 'calm' },
+  { flow: 'feel', label: 'How I feel', hint: 'Shared with School Admins', icon: '💬', tone: 'calm' },
   { flow: 'hazard', label: 'Report a hazard', hint: 'Unsafe, bullying, suspicious', icon: '⚠️', tone: 'warn' },
   { flow: 'incident', label: 'Report an incident', hint: 'Emergency, medical, security', icon: '🚨', tone: 'danger' },
   { flow: 'observation', label: 'Suggest or observe', hint: 'Ideas and concerns', icon: '💡', tone: 'calm' },
@@ -42,9 +43,11 @@ type Props = {
   incidents: Incident[];
   checkIns: CheckIn[];
   onSent: () => void;
+  onProfileChanged: () => Promise<void>;
 };
 
-export function ReportPanel({ profile, features, locations, incidents, checkIns, onSent }: Props) {
+export function ReportPanel({ profile, features, locations, incidents, checkIns, onSent, onProfileChanged }: Props) {
+  const defaultId = profile.primary_location_id && locations.some((l) => l.id === profile.primary_location_id) ? profile.primary_location_id : null;
   const flows = FLOWS.filter((f) => features.has(FLOW_FEATURE[f.flow]));
   const [flow, setFlow] = useState<Flow | null>(null);
   const [step, setStep] = useState<Step>('choice');
@@ -59,7 +62,7 @@ export function ReportPanel({ profile, features, locations, incidents, checkIns,
     setFlow(next);
     setChoice(null);
     setStress(null);
-    setLocationId(null);
+    setLocationId(defaultId);
     setError('');
     setDone(null);
     setStep(next === 'safe' || next === 'help' ? 'location' : 'choice');
@@ -196,6 +199,7 @@ export function ReportPanel({ profile, features, locations, incidents, checkIns,
         {step === 'location' && (
           <>
             <h2 className="flow-question">{flow === 'help' ? 'Where are you?' : 'Where is this?'}</h2>
+            {defaultId && locationId === defaultId && <p className="fine-print">Starting from your default location. Change it below if you are somewhere else.</p>}
             <PlacePicker
               locations={locations}
               initial={locationId}
@@ -251,6 +255,8 @@ export function ReportPanel({ profile, features, locations, incidents, checkIns,
         ))}
       </div>
 
+      <DefaultLocationCard profile={profile} locations={locations} onChanged={onProfileChanged} />
+
       {(myIncidents.length > 0 || myCheckIns.length > 0) && (
         <div className="my-activity">
           <h3 className="section-title">My recent activity</h3>
@@ -294,21 +300,21 @@ function doneMessage(flow: Flow, caseRef?: string): { title: string; detail: str
     case 'help':
       return {
         title: 'Help request sent',
-        detail: 'Security, DRRM, and School Admin can see it on their dashboard. If you are in danger right now, go to the nearest teacher or staff member.',
+        detail: 'School Admins can see it on their dashboard. If you are in danger right now, go to the nearest teacher or staff member.',
       };
     case 'safe':
       return { title: 'Thanks for checking in', detail: 'You are marked safe.' };
     case 'incident':
       return { title: `Incident ${caseRef ?? ''} sent`, detail: 'Responders can see it now. Track its status under My recent activity.' };
     case 'feel':
-      return { title: 'Thank you for sharing', detail: 'Only the Guidance team can see how you feel.' };
+      return { title: 'Thank you for sharing', detail: 'Only School Admins can see how you feel.' };
     default:
       return { title: 'Report sent', detail: 'The safety team will review it.' };
   }
 }
 
 function privacyNote(flow: Flow): string {
-  if (flow === 'feel') return 'Only Guidance counselors can read feelings you share.';
-  if (flow === 'help') return 'Security, DRRM, and School Admin see this on their dashboard.';
+  if (flow === 'feel') return 'Only School Admins (coordinators and responders) can read feelings you share.';
+  if (flow === 'help') return 'School Admins see this on their dashboard right away.';
   return 'Your name is attached so the team can follow up with you.';
 }

@@ -1,6 +1,6 @@
 # SENTINEL System Design
 
-Status as of 2026-10-22. Describes the frontend in this repo and the live Supabase project
+Status as of 2026-10-23. Describes the frontend in this repo and the live Supabase project
 (`cshs-sentinel's Project`, region `ap-southeast-1`, Postgres 17). Where this document and the
 repo's migrations disagree, the live database is authoritative (see [Known gaps](#12-known-gaps)).
 
@@ -9,7 +9,7 @@ repo's migrations disagree, the live database is authoritative (see [Known gaps]
 SENTINEL helps a school keep its learning environment safe and motivating. It collects signals
 from inside the school (how people feel, hazards, incidents, help requests) and outside it
 (heat index, rain, wind, earthquakes). It turns those signals into prioritized insights so the
-right people can act early. Each user belongs to one school and has one of eight roles.
+right people can act early. Each user belongs to one school, has one of three fixed primary roles (Community Member, School Admin, System Admin), and holds one position that is mapped to that role.
 
 Design principles:
 
@@ -17,7 +17,7 @@ Design principles:
 - **Each role sees only what it needs.** The database enforces this, not just the UI.
 - **Insights lead to actions.** An insight explains what is happening and offers the next step,
   such as drafting an alert.
-- **Wellbeing data stays confidential.** Only Guidance reads individual feelings.
+- **Wellbeing data goes only to school staff.** Individual feelings are readable by the School Admin role (coordinators and responders), never by other Community Members.
 
 ## 2. Architecture
 
@@ -62,7 +62,7 @@ flowchart LR
 | Component | Location | Responsibility |
 | --- | --- | --- |
 | App shell | `src/App.tsx` | Login, greeting, alert banner, menus built from the user type (bottom bar on phones) |
-| Role catalog | `src/roles.ts` | The 8 base roles and their labels |
+| Role catalog | `src/roles.ts` | The 3 primary roles and their labels |
 | Feature catalog | `src/lib/features.ts` | Features, the most each base role can have, defaults, and menu order |
 | Setup | `src/components/SetupPanel.tsx` | Locations tree, map layout, location types, user types |
 | Layout editor | `src/components/LayoutEditor.tsx` | Drag-and-drop grid editor for the campus map |
@@ -84,7 +84,7 @@ flowchart LR
 | Theme | `src/theme.ts` | Light, Dark, and Neon themes |
 | Demo accounts | `scripts/seed-sample-accounts.mjs` | One login per role |
 | Demo activity | `scripts/seed-demo-activity.mjs` | 14 days of synthetic, tagged activity; `--clean` removes it |
-| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types; `0004` adds map layout fields; `0005` sets the Campus › Building › Floor › Room hierarchy; `0006` adds privacy-safe sentiment totals; `0007` adds the incident Priority Index |
+| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types; `0004` adds map layout fields; `0005` sets the Campus › Building › Floor › Room hierarchy; `0006` added privacy-safe sentiment totals (dropped by `0011`); `0007` adds the incident Priority Index; `0008` and `0009` set the default location types and the Area tier; `0010` and `0011` move the app to three roles, positions, validated registration, and the default location |
 
 ## 4. Data model
 
@@ -92,8 +92,8 @@ All tables are in `public`, have RLS enabled, and are scoped by `school_id`.
 
 | Table | Holds | Values the app uses |
 | --- | --- | --- |
-| `profiles` | One row per user: `role`, `user_type_id`, `school_id`, `is_active` | 8 `app_role` values |
-| `user_types` | Admin-defined user types per school | `base_role`, `features`, `is_active`, `is_system` for the 8 built-in types |
+| `profiles` | One row per user: `role`, `user_type_id`, `school_id`, `primary_location_id` (default location), `is_active` | 3 stored roles: `system_admin`, `school_admin`, `community` |
+| `user_types` | Positions (designations) per school, each mapped to one role | `base_role`, `features`, `is_active`, `is_system`, `selectable_at_signup`, `authorized_privileged` |
 | `submissions` | Feelings, hazards, and observations | `kind`: `sentiment` (sub-types joy, calm, worried, stressed, sad, angry, lonely, hopeless; plus `stress_level` 1–5), `incident_hazard` (unsafe_condition, bullying, suspicious_activity), `observation` (safety_concern, report, suggestion). Status new → acknowledged → resolved |
 | `check_ins` | Location check-ins | `status`: `safe` or `need_help` |
 | `incidents` | Cases with a generated `case_ref` (`SNT-YYYY-NNNN`) | Category: emergency, medical, security, other. Status new → acknowledged → assigned → in_progress → resolved → closed, or cancelled. Priority factors and the generated `priority_index` / `priority_level` |
@@ -113,45 +113,57 @@ Database rules the app depends on:
   friendly message when this limit is hit.
 - Submissions cannot be edited except to move their review status forward.
 
-## 5. Roles
+## 5. Roles and positions
 
-These are the 8 base roles and the menus their built-in user types get. A System Admin can create
-other user types on top of these roles (see [School setup](#6-school-setup)).
+There are exactly **three primary roles**. The database decides access from the role alone. A
+System Admin creates **positions** (designations) and maps each to exactly one role; a person
+holds one position and gets its role. Details: [roles-and-permissions.md](roles-and-permissions.md).
 
 | Role | Default menus | What they can do |
 | --- | --- | --- |
-| Student | Report, Alerts | Send help requests, check-ins, feelings, hazards, incidents, suggestions. Track their own incidents and check-ins. See alerts and weather. |
-| Teacher | Map, Analytics · More: Queue, Alerts, Report | Everything a student can do. Review and resolve non-confidential reports. See report trends, hotspots, and bullying counts. |
-| Non-Teaching Staff | Report, Alerts | Same as Student. |
-| Security | Map, Analytics · More: Queue, Alerts, Report | See every incident and help request. Move incidents through the workflow. Review non-confidential reports. |
-| DRRM Coordinator | Map, Analytics · More: Queue, Alerts, Report | Same as Security, plus drafting alerts. Weather and hazard insights offer a one-tap draft. |
-| Guidance Counselor | Map, Analytics · More: Queue, Alerts, Report | The only role that reads individual feelings. Wellbeing analytics, follow-up queue, stress trends. |
-| School Admin | Map, Analytics · More: Queue, Alerts, Report, People | Everything responders see, approving, publishing, and withdrawing alerts, changing roles, and the audit log. Sees feelings only as privacy-safe totals per place, never individual entries. |
-| System Admin | Setup, People, Report | Configure the campus and places, location types, and user types. Assign user types (including System Admin) and read the audit log. No access to reports, incidents, or wellbeing data. |
+| Community Member | Report, Alerts | Send help requests, check-ins, feelings, hazards, incidents, suggestions. Track their own incidents and check-ins. Save a default campus location. See alerts and weather. The only role open to public sign-up. |
+| School Admin | Map, Analytics · More: Queue, Alerts, Report, People | Coordinators and responders. See every report, individual feeling, incident, and help request in the school. Move incidents through the workflow and set their priority. Draft, approve, publish, and withdraw alerts. Assign positions, and read the activity log. |
+| System Admin | Setup, People, Report | Configure the campus and places, location types, and positions (including each position's role and sign-up setting). Assign positions, including System Admin ones. No access to reports, incidents, or wellbeing data. |
+
+Existing positions were kept when the app moved to three roles: Student, Teacher, and
+Non-Teaching Staff map to Community Member; Security, DRRM Coordinator, Guidance Counselor, and
+School Admin map to School Admin; System Admin stays. The System Admin can remap any of them.
 
 Navigation (`navFor()` in `src/lib/features.ts`):
 
-- Roles with `insights.view` get **Map** and **Analytics** in the tab bar, and every other menu
+- A person with `insights.view` gets **Map** and **Analytics** in the tab bar, and every other menu
   they can use (Queue, Alerts, Report, People, Setup) behind **More (⋯)**. More is a dropdown on
   desktop and a sheet above the bottom bar on phones.
 - A red badge on More and on Queue keeps urgent work visible: help requests in the last 24 hours
-  plus unacknowledged incidents for Security, DRRM, and School Admin, and unresolved crisis
-  feelings (hopeless, lonely, or stress 5) for Guidance.
+  plus unacknowledged incidents.
 - Map and Analytics share one period (7, 14, or 30 days).
-- Roles without `insights.view` keep a short flat tab bar and no More menu.
+- Everyone else keeps a short flat tab bar and no More menu.
 
 Enforcement:
 
-- `is_reviewer()` is true for Security, DRRM, and School Admin. Reviewers read all incidents and
-  check-ins in their school.
-- Non-confidential submissions can be read by Teacher, Security, DRRM, and School Admin, filtered
-  by `kind <> 'sentiment'`.
-- Guidance reads and reviews all submissions, including feelings.
-- `dashboard_counts()` gives School Admin the number of open wellbeing reports without the rows.
-- `admin_set_user_type()` lets School and System Admins assign a user type in their school. It
-  sets the person's base role to the type's base role. Admins cannot change their own type, and
-  only a System Admin can assign or change a System Admin. Each change is written to the audit
-  log. `admin_set_user_role()` still works and also moves the person to that role's built-in type.
+- `is_reviewer()`, `is_admin()`, and `is_school_admin()` are true for the School Admin role.
+  They read all incidents, check-ins, and submissions (including feelings) in their school.
+- `dashboard_counts()` returns school totals for School Admins and personal counts for others.
+- `admin_set_user_type()` is the only way to change a person's position and role. School and
+  System Admins can assign positions in their school. Nobody can change their own, and only a
+  System Admin can assign or change a System Admin. Each change is written to the audit log.
+- Signed-in users have read-only access to `profiles`. Roles, positions, and the default
+  location change only through the functions above and `set_my_default_location()`.
+- `handle_new_user()` validates registration (see [Registration](#registration-and-default-location)).
+
+### Registration and default location
+
+- Public sign-up (`src/components/SignUpCard.tsx`) lists positions from
+  `registration_options()`: active, mapped to Community Member, and marked **Open for public
+  sign-up** in Setup › Positions. It starts closed until a System Admin opens a position.
+- The person also picks a **default campus location** with the same cascading dropdowns used
+  in reports. It must be active, not restricted, and in the position's school.
+- The form sends only name, position, and default location. `handle_new_user()` assigns the
+  role from the position and ignores anything else, including a submitted role. School Admin
+  and System Admin positions cannot be opened for sign-up. Admins are created by other admins.
+- The default location (`profiles.primary_location_id`) pre-fills the place step in reports and
+  check-ins. Each report stores the place the person actually chooses, separately. It can be
+  changed from the Report tab, and if the saved place becomes inactive the app asks for a new one.
 
 ## 6. School setup
 
@@ -219,41 +231,33 @@ that exist but are not drawn on a map that has other places drawn.
 
 ### Map tab and heatmaps
 
-Insight roles (Teacher, Security, DRRM, Guidance, School Admin) have a **Map** tab
+School Admins have a **Map** tab
 (`src/components/MapPanel.tsx`) with the same layout. Each block is shaded by activity in the
 selected period, counting everything inside that place. Controls, top to bottom: period, view
 (Whole campus / One level), heatmap type, then type filter and "Still needs a response".
 
-| Heatmap | Who | Shading | Type filter |
-| --- | --- | --- | --- |
-| All reports | All insight roles | Count of non-sentiment submissions and incidents | — |
-| Incidents | All insight roles (Teacher and Guidance see only their own) | Count | Emergency, Medical, Security, Other |
-| Hazards | All insight roles | Count of `incident_hazard` submissions | Unsafe condition, Bullying, Suspicious activity |
-| Concerns and suggestions | All insight roles | Count of `observation` submissions | Safety concern, General report, Suggestion |
-| Help requests | Security, DRRM, School Admin | Count of "I need help" check-ins | — |
-| Sentiment | Guidance (own rows), School Admin (totals only) | Average stress, 1–5 | Guidance: Negative feelings only |
+| Heatmap | Shading | Type filter |
+| --- | --- | --- |
+| All reports | Count of non-sentiment submissions and incidents | — |
+| Incidents | Count | Emergency, Medical, Security, Other |
+| Hazards | Count of `incident_hazard` submissions | Unsafe condition, Bullying, Suspicious activity |
+| Concerns and suggestions | Count of `observation` submissions | Safety concern, General report, Suggestion |
+| Help requests | Count of "I need help" check-ins | — |
+| Sentiment | Average stress, 1–5 | Negative feelings only |
 
 "Still needs a response" limits counts to open incidents and unresolved submissions. It does not
-apply to Help requests or to the School Admin's Sentiment layer.
+apply to Help requests.
 
 Tapping a block lists its latest items with their status, and **Open map ›** drills in. Reports
 filed at the parent itself, and places not yet on the map, are listed under the grid so nothing
 is hidden. Every map has a table view. Shading uses one sequential color per theme, and labels
 sit on a surface chip so they stay readable at any intensity.
 
-### Sentiment totals for School Admin
+### Sentiment
 
-School Admins cannot read individual feelings. Their Sentiment heatmap comes from
-`sentiment_by_location(p_days)` (migration `0006`), which only School Admin and Guidance can call:
-
-- Each feeling counts toward its place and every place above it, computed in the database.
-- Places with fewer than 3 feelings are not returned.
-- **Complementary suppression:** inside any place that is shown, the feelings that are hidden
-  (hidden child places plus feelings filed at the place itself) must total 0 or at least 3.
-  Otherwise the smallest shown child, or the place itself, is hidden too, and the check repeats.
-  This stops a small group from being worked out by subtracting shown totals from a parent total.
-- The map shows hidden places as "too few", and the details panel shows totals only, with no
-  list of entries.
+School Admins read individual feelings, so the Sentiment heatmap averages the feelings filed at
+or under each place. The earlier privacy-safe totals function (`sentiment_by_location`) was
+removed in migration `0011`, because the School Admin role may now read feelings directly.
 
 ### Location types
 
@@ -261,38 +265,39 @@ Admins add, rename, and turn off types, and choose each type's tier and environm
 outdoor, or either). A type's tier cannot change while active places use it
 (`validate_location_category`).
 
-### User types
+### Positions
 
-A user type has a name, an optional description, a **base role**, and a set of **features**.
+A position has a name, an optional description, a **role**, a set of **features**, and two
+switches: **Open for public sign-up** (Community Member positions only) and, for System Admin
+mappings, an explicit **authorization**.
 
-- The base role decides what the database allows: which rows the person can read and write. RLS
-  is unchanged and keeps the confidentiality rules (only Guidance reads individual feelings).
+- The role decides what the database allows: which rows the person can read and write.
 - Features decide what the person sees: the menus and each report button.
-- A type can never have a feature its base role does not allow. The database rejects it
+- A position can never have a feature its role does not allow. The database rejects it
   (`validate_user_type`, using `role_feature_ceiling()`), and the app greys those features out.
-- Each school has 8 built-in types, one per base role. They cannot be turned off or change base
-  role, but their features can be edited.
-- A type's base role cannot change, and the type cannot be turned off, while people have it.
+- The System Admin can change a position's role at any time. Everyone who holds it moves to the
+  new role in the same transaction, and each move is written to the audit log. A position open
+  for sign-up must be closed before it is mapped to School Admin or System Admin.
+- Mapping to System Admin needs the explicit authorization (for example for an ICT Coordinator),
+  and the last active System Admin cannot be moved away.
 
 Features:
 
-| Feature | Shows | Allowed base roles |
+| Feature | Shows | Allowed roles |
 | --- | --- | --- |
 | `report.help`, `report.safe`, `report.feeling`, `report.hazard`, `report.incident`, `report.observation` | The six report buttons | All |
 | `alerts.view` | Alerts menu (weather and published alerts) | All |
-| `insights.view`, `queue.view` | Map, Analytics, and Queue menus | Teacher, Security, DRRM, Guidance, School Admin |
-| `alerts.draft` | Drafting alerts | DRRM, School Admin |
-| `alerts.approve` | Approving, publishing, withdrawing alerts | School Admin |
+| `insights.view`, `queue.view` | Map, Analytics, and Queue menus | School Admin |
+| `alerts.draft`, `alerts.approve` | Drafting, approving, publishing, withdrawing alerts | School Admin |
 | `people.manage` | People menu | School Admin, System Admin |
 | `setup.locations` | Setup: locations and location types | School Admin, System Admin |
-| `setup.user_types` | Setup: user types | System Admin |
+| `setup.user_types` | Setup: positions | System Admin |
 
-Example: **Canteen Staff**, base role Non-Teaching Staff, with I need help, I'm safe, Report a
-hazard, Report an incident, and Alerts. Canteen staff see only those 4 report buttons and the
-Alerts menu.
+Example: **Canteen Staff**, mapped to Community Member, with I need help, I'm safe, Report a
+hazard, Report an incident, and Alerts. They see only those 4 report buttons and the Alerts menu.
 
-Turning a feature off hides it in the app. The base role is still the security boundary: a person
-whose base role allows an action can technically still perform it through the API.
+Turning a feature off hides it in the app. The role is still the security boundary: a person
+whose role allows an action can technically still perform it through the API.
 
 ## 7. Reporting (mobile-first, buttons only)
 
@@ -343,7 +348,7 @@ How it works (migration `0007`):
 - The three factors are stored on `incidents`. `priority_index` and `priority_level` are generated
   columns, so the formula and ranges live only in the database.
 - `set_incident_priority(incident, severity, urgency, affected)` is the only way to set them. It
-  allows Security, DRRM, and School Admin in the incident's school, refuses closed or cancelled
+  allows School Admins in the incident's school, refuses closed or cancelled
   incidents and values outside 1–4, records who set it and when, and writes an
   `incident_prioritized` audit entry.
 - In the Queue each incident shows a priority chip (colored dot and tint plus the class name and
@@ -363,31 +368,29 @@ submissions and incidents, check-ins, and the weather and earthquake feeds. A ti
 
 | Insight | Trigger | Who sees it | Action |
 | --- | --- | --- | --- |
-| Heat | Today's peak heat index ≥ 33 °C (PAGASA Extreme caution or worse) | All insight roles | DRRM and Admin: draft heat advisory |
-| Rain / storm | Thunderstorm code, or any hour ≥ 7.5 mm, in the next 24 h | All insight roles | Draft rain advisory |
-| Wind | Gusts ≥ 60 km/h (≥ 89 km/h is critical) | All insight roles | Draft wind advisory |
-| Earthquake | M ≥ 5 within 300 km in 7 days, or M ≥ 4 within 100 km in 24 h | All insight roles | Draft building-check alert |
-| Help requests | Any `need_help` check-in in 24 h | Security, DRRM, Admin | Go to Queue |
-| Overdue incidents | Not acknowledged after 15 minutes | All insight roles that can read incidents | Acknowledge |
-| Hotspot | One place with ≥ 3 reports in 7 days | All insight roles | Schedule an inspection |
-| Bullying rising | This week ≥ 2 and ≥ 1.5 × last week | All insight roles | Coordinate with Guidance |
-| Follow-ups | Unresolved feeling that is hopeless, lonely, or stress 5 | Guidance | Queue lists them first |
-| Negative mood | ≥ 50% negative feelings this week (at least 5 reports) | Guidance | Wellbeing activity |
-| Stress rising | Weekly average up by ≥ 0.5 | Guidance | Check exam clustering |
-| Stress and heat | Average stress on hot days (peak ≥ 33 °C) vs cooler days, with at least 5 reports on each side | Guidance | Information only, described as a pattern, not a cause |
+| Heat | Today's peak heat index ≥ 33 °C (PAGASA Extreme caution or worse) | School Admin | Draft heat advisory |
+| Rain / storm | Thunderstorm code, or any hour ≥ 7.5 mm, in the next 24 h | School Admin | Draft rain advisory |
+| Wind | Gusts ≥ 60 km/h (≥ 89 km/h is critical) | School Admin | Draft wind advisory |
+| Earthquake | M ≥ 5 within 300 km in 7 days, or M ≥ 4 within 100 km in 24 h | School Admin | Draft building-check alert |
+| Help requests | Any `need_help` check-in in 24 h | School Admin | Go to Queue |
+| Overdue incidents | Not acknowledged after 15 minutes | School Admin | Acknowledge |
+| Hotspot | One place with ≥ 3 reports in 7 days | School Admin | Schedule an inspection |
+| Bullying rising | This week ≥ 2 and ≥ 1.5 × last week | School Admin | Consider an anti-bullying session |
+| Follow-ups | Unresolved feeling that is hopeless, lonely, or stress 5 | School Admin | Queue lists them first |
+| Negative mood | ≥ 50% negative feelings this week (at least 5 reports) | School Admin | Wellbeing activity |
+| Stress rising | Weekly average up by ≥ 0.5 | School Admin | Check exam clustering |
+| Stress and heat | Average stress on hot days (peak ≥ 33 °C) vs cooler days, with at least 5 reports on each side | School Admin | Information only, described as a pattern, not a cause |
 
 Insights are sorted by severity: Act now, Act soon, Watch, Note. Every status color comes with
 an icon and a word.
 
 ### Dashboards
 
-- **Guidance:** feelings shared, average stress, share of negative feelings, follow-ups. Charts
-  for stress by day, how students feel, where feelings were shared, and other reports.
-- **Teacher:** open reports, report volume, bullying count. Charts for reports per day, by type,
-  and hotspots.
-- **Security, DRRM, School Admin:** open incidents, not acknowledged, median time to acknowledge,
-  help requests in 24 h, open hazards, and the open wellbeing count for Admin. Charts for daily
-  volume, incidents by category, reports by type, and hotspots.
+- **Operations:** open incidents, not acknowledged, median time to acknowledge, help requests in
+  24 h, open hazards, and open wellbeing reports. Charts for daily volume, incidents by category,
+  reports by type, and hotspots.
+- **Wellbeing:** feelings shared, average stress, share of negative feelings, follow-ups. Charts
+  for stress by day, how people feel, and where feelings were shared.
 
 Every chart has a "View as table" option and keyboard focus. Charts use one series color per
 theme, checked with the dataviz palette validator against each theme's surface.
@@ -395,7 +398,7 @@ theme, checked with the dataviz palette validator against each theme's surface.
 ### Alert workflow
 
 1. An insight's **Draft alert** button, or a template button (Heat, Rain, Wind, Earthquake,
-   Wellbeing), fills in the composer. DRRM or Admin sets severity and audience, then saves a draft.
+   Wellbeing), fills in the composer. A School Admin sets severity and audience, then saves a draft.
 2. School Admin approves, then publishes. The newest published alert appears as a banner for
    everyone.
 3. School Admin can withdraw a published alert. The author or an Admin can cancel a draft.
@@ -418,9 +421,11 @@ If they are not set, Manila is used, and the UI says so.
 
 - The browser uses only the publishable key. RLS and workflow functions guard every read and write.
 - The service role key is used only by local seed scripts and is never bundled.
-- New accounts start as `student`.
-- Individual feelings are readable only by Guidance. The person who sent a feeling cannot read it
-  back, and School Admin sees only a count.
+- Public sign-up creates Community Members only. The database picks the role from the position
+  and ignores anything else the browser sends. Privileged positions cannot be opened for sign-up.
+- Signed-in users cannot write to `profiles`; roles change only through audited functions.
+- Individual feelings are readable by the School Admin role. The person who sent a feeling cannot
+  read it back, and other Community Members cannot read it at all.
 - External calls send only the school's coordinates.
 - Helper functions use `SECURITY DEFINER` with an empty `search_path`.
 - Role changes and the alert workflow are written to `audit_logs`.
@@ -451,21 +456,24 @@ demo activity live.
 4. **No school coordinates in the database.** The location comes from build-time variables.
 5. **Analytics run in the browser** over the last 60 days, capped at 2,000 submissions and
    1,000 incidents. Larger schools will need database views or RPCs that aggregate on the server.
-6. **Report attachments policy.** In `report_attachments_select_scoped` and
-   `report_attachments_delete_scoped`, the subquery compares `s.school_id = s.school_id`, which is
-   always true. It should compare to `report_attachments.school_id`.
+6. **Report attachments policy.** Fixed in migration `0011`: the self-comparing subquery was
+   replaced with a check against the attachment's own school.
 7. **Reporters cannot see past submissions.** No RLS policy lets a sender read their own
    feelings or reports. The app shows only their incidents and check-ins.
 8. **Demo accounts share the real school.** The demo campus, demo activity, and original sample
    rows were deleted on 2026-10-22. The 8 demo accounts still sign in to the same school as the
    real Cabiao SHS setup, so anything they report lands in real analytics. A separate test
    school would keep them apart.
-9. **No automated tests**, no password reset, and no self-service sign-up.
+9. **Limited automated tests.** `npm test` runs unit tests for roles, features, and locations.
+   `npm run test:db` runs the database acceptance tests (rolled back). There are no browser
+   tests, and no password reset.
 10. **Features are not enforced by the database.** Turning a feature off hides it in the app, but
-    the base role still allows the action through the API. Enforcing report features in the
-    insert policies would close this.
-11. **No school or campus assignment for new accounts.** New sign-ups get the Student role and no
-    school. There is no screen yet to place an account in a school.
+    the role still allows the action through the API. Enforcing report features in the insert
+    policies would close this.
+11. **Sign-up needs an email setting check.** Public sign-up is built and the database enforces
+    it, but it starts closed (no position is open) and the Supabase auth `site_url` still needs
+    to point at the live app before confirmation emails work. A person who registers is placed in
+    the school of the position they choose; there is one school today.
 12. **Credentials.** `.env` values appeared in a working session's logs. Rotate the Supabase
     management token, service role key, database password, Cloudflare token, and the GitHub token
     that was shared in chat.

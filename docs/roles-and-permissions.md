@@ -1,71 +1,107 @@
 # SENTINEL roles and permissions
 
-This reflects the `app_role` enum and row-level security policies actually enforced by the
-connected Supabase project (`cshs-sentinel's Project`). Every account has exactly one role,
-stored on `public.profiles.role`.
+This reflects the row-level security policies and functions actually enforced by the connected
+Supabase project (`cshs-sentinel's Project`), as changed by migrations `0010` and `0011`.
 
-## Student
+## Two layers
 
-The default role for every new sign-up. Can submit survey/check-in responses, file an incident
-or hazard report, and track their own submissions. Sees published alerts targeted at `all` or at
-the `student` role.
+1. **Three fixed primary roles.** Every account has exactly one, stored on `public.profiles.role`.
+   The database decides what a person can read or change from this role alone.
+2. **Designations (positions).** A System Admin creates positions such as "Teacher", "Security",
+   "DRRM Coordinator", or "ICT Coordinator" and maps each one to exactly one primary role. A
+   person holds one position, and gets the role it is mapped to. The label never grants access.
+   Positions also choose which menus and buttons the person sees (their *features*), but never
+   more than the role allows.
 
-## Teacher
+No position is created by default beyond the built-in ones the school already had. Which role a
+position maps to is the System Admin's decision, and it can be changed at any time.
 
-Everything a Student can do, plus read/update access to non-confidential (non-`sentiment`)
-submissions school-wide, so classroom-level concerns can be triaged without seeing counseling
-content.
+## The three roles
 
-## Non-Teaching Staff
+### Community Member
 
-Support staff. Currently has the same access as Student — reporting and surveys — with no
-additional reviewer or staff-triage permissions.
+The role for students, teachers, non-teaching staff, and anyone else who reports. Can send help
+requests, safe check-ins, feelings, hazards, incidents, and suggestions, and see published
+alerts. Reads only their own incidents, check-ins, and reports, and their own profile. Cannot
+see other people, the Queue, analytics, or setup. This is the **only** role open to public
+sign-up.
 
-## Security
+### School Admin (coordinators and responders)
 
-An incident "reviewer": sees every incident and check-in school-wide (not just their own),
-acknowledges and assigns cases, adds internal notes, and receives responder-scoped alerts. Also
-has the Teacher-level non-confidential submissions access.
+Security, DRRM coordinators, guidance counselors, and school administrators. Sees the whole
+school's reports, individual feelings, incidents, check-ins, and people. Acknowledges and moves
+incidents through the workflow and rates their priority. Drafts, approves, publishes, and
+withdraws alerts. Assigns positions to people in their own school, but cannot change their own
+position and cannot assign or change a System Admin. Reads the activity log. Which of these
+menus each person sees depends on their position's features.
 
-## DRRM Coordinator
+### System Admin
 
-The same reviewer and staff-submissions access as Security, plus the ability to draft alerts
-(which require School Admin approval before publishing).
+The school's setup administrator. Configures the campus and its places, location types, and
+positions (including which role each maps to and which are open for sign-up). Assigns positions,
+including System Admin ones. Does not see reports, incidents, or wellbeing data.
 
-## Guidance Counselor
+An ICT Coordinator position can be mapped to System Admin only when the System Admin explicitly
+authorizes it (`authorized_privileged`). The last active System Admin cannot be moved away.
 
-The only role with access to confidential (`kind = 'sentiment'`) submissions — wellbeing
-check-ins and disclosures. This access is deliberately siloed: Guidance is **not** an incident
-reviewer and does not see the incidents table beyond their own reports, keeping counseling
-content separate from general safety/security case management.
+## Registration
 
-## School Admin
+- Public sign-up shows only positions that are **active**, **mapped to Community Member**, and
+  **marked open for sign-up**. School Admin and System Admin positions cannot be opened for
+  sign-up (a database check enforces this).
+- The person must also pick a **default campus location**. It must be an active, non-restricted
+  place in the same school as the position.
+- The role is decided by the database trigger `handle_new_user()` from the position. A role (or
+  any other field) sent by the browser is ignored. Sign-ups without registration details are
+  refused unless an administrator created the account through the service key
+  (`app_metadata.provisioned = 'admin'`).
+- Admins are created by other admins: an existing School or System Admin assigns an admin
+  position in the People tab, or the System Admin creates the account.
+- Public sign-up starts **closed**. A System Admin opens it per position in Setup › Positions
+  (“Open for public sign-up”).
 
-Full operational authority: reviewer on incidents/check-ins, staff-level submissions access,
-approves and publishes alerts, manages locations/categories/schedules, and reads the school's
-audit log.
+## Default location
 
-## System Admin
+Stored on `profiles.primary_location_id`. It only **pre-fills** the place step of reports and
+check-ins. Each report keeps its own `location_id`, so the place where something actually
+happened is stored separately and is never overwritten by the default.
 
-The school's setup administrator. This role configures the campus tree (campus, buildings,
-floors, rooms, CRs, and other areas), the location types, and the user types, and assigns user
-types to people. It can grant System Admin. It intentionally does not have Guidance's
-confidential-content access or School Admin's incident and alert rights.
+- Changed from the Report tab (“My default location”), through `set_my_default_location()`.
+- Only active, non-restricted places in the person's school are accepted.
+- If the saved place later becomes inactive, it stays on file but the app asks for a replacement
+  and the database refuses new reports at an inactive place.
 
-## User types
+## Enforcement
 
-These 8 roles are the **base roles**. A System Admin can create any number of user types on top
-of them, such as "Canteen Staff" on Non-Teaching Staff or "School Nurse" on Guidance Counselor, and
-choose which menus and report buttons each type gets. A user type can never get more than its
-base role allows. See [system-design.md](system-design.md#6-school-setup).
+| Rule | Where |
+| --- | --- |
+| Only three role values can be stored | `profiles_primary_roles_check`, `user_types_primary_roles_check` |
+| A position's features cannot exceed its role | `validate_user_type()` using `role_feature_ceiling()` |
+| Remapping a position moves everyone who holds it, and logs each move | `sync_designation_role()` |
+| Nobody changes their own role or position | `profiles` is read-only for signed-in users; `admin_set_user_type()` refuses self-changes |
+| Only System Admins assign System Admin positions | `admin_set_user_type()` |
+| School isolation | Every policy and function is scoped by `my_school_id()` |
+| Sign-up is validated by the database | `handle_new_user()` |
+
+## Limits to know about
+
+- Fine-grained abilities (for example “Security can see Queue but not People”) are **menus and
+  buttons only**. The database enforces the three roles; it does not enforce the per-position
+  feature list. Anyone with the School Admin role can read everything a School Admin can read,
+  whatever their position hides.
+- Earlier role labels (`student`, `teacher`, `security`, `drrm`, `guidance`, `non_teaching`)
+  still exist inside the Postgres enum because Postgres cannot drop enum values, but a CHECK
+  constraint stops them from being stored.
+- Existing accounts were moved onto the three roles, keeping their position name: Student,
+  Teacher, and Non-Teaching Staff became Community Member; Security, DRRM Coordinator, Guidance
+  Counselor, and School Admin became School Admin; System Admin stayed. Each move is in
+  `audit_logs` with `via: designation_remapped`.
 
 ## Notes for contributors
 
-- People are assigned a user type in the app's People tab, which calls `admin_set_user_type()`.
-  That also sets their base role. School and System Admins can do this in their own school,
-  cannot change their own type, and only a System Admin can assign or change a System Admin.
-  Every change is written to `audit_logs`. There is no separate `user_roles` table in the live
-  schema, unlike an earlier draft of this repo's migration.
-- See [system-design.md](system-design.md) for the features and insights each role gets.
-- `scripts/seed-sample-accounts.mjs` creates one demo login per role (see the project README) so
-  every role above can be signed into and previewed without touching real accounts.
+- `scripts/seed-sample-accounts.mjs` creates or re-syncs the demo logins (listed in the README)
+  with `app_metadata.provisioned = 'admin'` and a position each.
+- Run `npm test` for the unit tests and `npm run test:db` for the database acceptance tests. The
+  database tests run in one transaction that always rolls back. See
+  [acceptance-test-results.md](acceptance-test-results.md).
+- See [system-design.md](system-design.md) for menus, insights, and the rest of the design.

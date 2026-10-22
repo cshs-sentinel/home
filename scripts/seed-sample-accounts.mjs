@@ -1,6 +1,9 @@
-// One-off/idempotent seed script: creates (or re-syncs) one demo login per
-// app_role so every role in docs/roles-and-permissions.md can be signed in
-// and previewed. Requires SUPABASE_SERVICE_ROLE_KEY — run locally only,
+// One-off/idempotent seed script: creates (or re-syncs) demo logins for the
+// three primary roles (Community Member, School Admin, System Admin) with a
+// designation each, so every role in docs/roles-and-permissions.md can be
+// signed in and previewed. Accounts are marked app_metadata.provisioned =
+// 'admin', which the sign-up trigger requires for accounts that are created
+// without registration details (only the service key can set it). Requires SUPABASE_SERVICE_ROLE_KEY — run locally only,
 // never in the browser/frontend bundle.
 //
 // Usage: node scripts/seed-sample-accounts.mjs
@@ -58,6 +61,7 @@ async function ensureUser(email) {
     email,
     password,
     email_confirm: true,
+    app_metadata: { provisioned: 'admin' },
   });
   if (!error) return { user: data.user, created: true };
 
@@ -73,10 +77,12 @@ const results = [];
 for (const account of accounts) {
   const { user, created } = await ensureUser(account.email);
 
+  const { data: designation } = await admin.from('user_types').select('id, base_role').eq('school_id', schoolId).eq('name', account.designation).maybeSingle();
   const { error: profileError } = await admin
     .from('profiles')
     .update({
-      role: account.role,
+      role: designation?.base_role ?? account.role,
+      user_type_id: designation?.id ?? null,
       display_name: account.displayName,
       school_id: schoolId,
       is_active: true,
@@ -85,7 +91,7 @@ for (const account of accounts) {
 
   if (profileError) throw profileError;
 
-  results.push({ role: account.role, email: account.email, status: created ? 'created' : 'already existed' });
+  results.push({ role: designation?.base_role ?? account.role, designation: account.designation, email: account.email, status: created ? 'created' : 'already existed' });
 }
 
 console.table(results);

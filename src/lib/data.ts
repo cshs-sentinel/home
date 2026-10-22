@@ -6,7 +6,9 @@ import type { Role } from '../roles';
 
 const HISTORY_DAYS = 60;
 
-const READS_SUBMISSIONS: Role[] = ['teacher', 'security', 'drrm', 'guidance', 'school_admin'];
+export const USER_TYPE_COLUMNS = 'id, name, description, base_role, features, is_active, is_system, selectable_at_signup, authorized_privileged';
+
+const READS_SUBMISSIONS: Role[] = ['school_admin'];
 const MANAGES_PEOPLE: Role[] = ['school_admin', 'system_admin'];
 
 export type SchoolData = {
@@ -64,10 +66,10 @@ export function useSchoolData(profile: Profile) {
         .order('created_at', { ascending: false })
         .limit(100),
       managesPeople
-        ? supabase.from('profiles').select('id, role, display_name, school_id, user_type_id').order('display_name')
+        ? supabase.from('profiles').select('id, role, display_name, school_id, user_type_id, primary_location_id').order('display_name')
         : Promise.resolve({ data: [], error: null }),
       managesPeople
-        ? supabase.from('user_types').select('id, name, description, base_role, features, is_active, is_system').order('name')
+        ? supabase.from('user_types').select(USER_TYPE_COLUMNS).order('name')
         : Promise.resolve({ data: [], error: null }),
       managesPeople
         ? supabase.from('audit_logs').select('id, action, entity_type, created_at').order('created_at', { ascending: false }).limit(40)
@@ -144,7 +146,8 @@ function toResult(error: { message: string } | null): Result {
 function friendlyError(message: string): string {
   if (message.includes('already have an open incident')) return 'You already reported an incident a few minutes ago. Responders have it. Please wait before sending another.';
   if (message.includes('row-level security')) return 'Your role is not allowed to do that.';
-  if (message.includes('user_types_school_name_key')) return 'A user type with that name already exists.';
+  if (message.includes('Database error saving new user')) return 'Registration was refused. Check your name, position, and default location, then try again.';
+  if (message.includes('user_types_school_name_key')) return 'A position with that name already exists.';
   return message;
 }
 
@@ -229,7 +232,7 @@ export async function loadSetup(): Promise<{ data: SetupData; error: string | nu
   const [locations, types, userTypes] = await Promise.all([
     supabase.from('locations').select('id, name, environment, parent_id, category_id, code, status, grid_cols, grid_rows, layout_x, layout_y, layout_w, layout_h').order('name').limit(5000),
     supabase.from('location_categories').select('id, name, level, environment, is_active').order('level').order('name'),
-    supabase.from('user_types').select('id, name, description, base_role, features, is_active, is_system').order('name'),
+    supabase.from('user_types').select(USER_TYPE_COLUMNS).order('name'),
   ]);
   const error = [locations, types, userTypes].find((r) => r.error)?.error?.message ?? null;
   return {
@@ -271,9 +274,17 @@ export async function saveLocationType(
 
 export async function saveUserType(
   profile: Profile,
-  input: { id?: string; name: string; description: string; baseRole: Role; features: string[]; isActive: boolean },
+  input: { id?: string; name: string; description: string; baseRole: Role; features: string[]; isActive: boolean; selectableAtSignup: boolean; authorizedPrivileged: boolean },
 ): Promise<Result> {
-  const row = { name: input.name.trim(), description: input.description.trim() || null, base_role: input.baseRole, features: input.features, is_active: input.isActive };
+  const row = {
+    name: input.name.trim(),
+    description: input.description.trim() || null,
+    base_role: input.baseRole,
+    features: input.features,
+    is_active: input.isActive,
+    selectable_at_signup: input.baseRole === 'community' && input.selectableAtSignup,
+    authorized_privileged: input.baseRole === 'system_admin' && input.authorizedPrivileged,
+  };
   const { error } = input.id
     ? await supabase.from('user_types').update(row).eq('id', input.id)
     : await supabase.from('user_types').insert({ ...row, school_id: profile.school_id });
@@ -293,11 +304,31 @@ export async function setGridSize(locationId: string, cols: number, rows: number
   return toResult(error);
 }
 
-export type PlaceSentiment = { location_id: string; entries: number; avg_stress: number };
+// --- Registration and default location ---
 
-// Privacy-safe totals: places with fewer than 3 feelings, or whose small
-// groups could be worked out by subtraction, are left out by the database.
-export async function fetchSentimentByLocation(days: number): Promise<{ data: PlaceSentiment[]; error: string | null }> {
-  const { data, error } = await supabase.rpc('sentiment_by_location', { p_days: days });
-  return { data: ((data ?? []) as PlaceSentiment[]).map((r) => ({ ...r, avg_stress: Number(r.avg_stress) })), error: error ? friendlyError(error.message) : null };
+export type RegistrationOptions = {
+  open: boolean;
+  designations: { id: string; name: string; description: string | null }[];
+  locations: { id: string; name: string; parent_id: string | null; level: number }[];
+};
+
+export async function fetchRegistrationOptions(): Promise<{ data: RegistrationOptions | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('registration_options');
+  return { data: (data as RegistrationOptions | null) ?? null, error: error ? friendlyError(error.message) : null };
+}
+
+// Only the name, designation, and default location are sent. The database
+// decides the role from the designation and ignores anything else.
+export async function registerAccount(input: { email: string; password: string; displayName: string; designationId: string; locationId: string }): Promise<Result & { needsConfirmation?: boolean }> {
+  const { data, error } = await supabase.auth.signUp({
+    email: input.email.trim(),
+    password: input.password,
+    options: { data: { display_name: input.displayName.trim(), designation_id: input.designationId, default_location_id: input.locationId } },
+  });
+  return { ...toResult(error), needsConfirmation: !error && !data.session };
+}
+
+export async function setMyDefaultLocation(locationId: string): Promise<Result> {
+  const { error } = await supabase.rpc('set_my_default_location', { p_location_id: locationId });
+  return toResult(error);
 }

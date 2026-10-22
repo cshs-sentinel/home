@@ -4,7 +4,7 @@ A school safety and wellbeing app. Students and staff report how they feel, haza
 and help requests in a few taps on their phone. SENTINEL combines those reports with live weather,
 heat index, and earthquake data, and gives admins and coordinators a campus heatmap, analytics,
 and suggested actions such as drafting an alert. Each role sees only what it needs, and individual
-feelings stay with Guidance.
+feelings go only to School Admins.
 
 Live preview: https://sentinel-school-safety-preview.sentinelcshs.workers.dev
 
@@ -25,33 +25,53 @@ The app signs in against the live Supabase project via `VITE_SUPABASE_URL` and
 `VITE_SUPABASE_ANON_KEY` in `.env` (see `.env.example`). `SUPABASE_SERVICE_ROLE_KEY` is also
 required, but only for the local seed script below — it is never bundled into the frontend.
 
-## Roles and demo accounts
+## Roles, positions, and demo accounts
 
-See [docs/roles-and-permissions.md](docs/roles-and-permissions.md) for what each of the 8 roles
-can do. One demo account per role already exists in the connected project; from the login card
-on the homepage, open "Try a demo account for every role" to sign in as any of them with one
-click, or sign in manually with:
+SENTINEL has three fixed roles: **Community Member**, **School Admin** (coordinators and
+responders), and **System Admin**. A System Admin creates positions such as Teacher, Security, or
+ICT Coordinator and maps each one to a role. See
+[docs/roles-and-permissions.md](docs/roles-and-permissions.md).
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Student | demo.student@sentinel.test | `Sentinel!Demo1` |
-| Teacher | demo.teacher@sentinel.test | `Sentinel!Demo1` |
-| Non-Teaching Staff | demo.nonteaching@sentinel.test | `Sentinel!Demo1` |
-| Security | demo.security@sentinel.test | `Sentinel!Demo1` |
-| DRRM Coordinator | demo.drrm@sentinel.test | `Sentinel!Demo1` |
-| Guidance Counselor | demo.guidance@sentinel.test | `Sentinel!Demo1` |
-| School Admin | demo.schooladmin@sentinel.test | `Sentinel!Demo1` |
-| System Admin | demo.systemadmin@sentinel.test | `Sentinel!Demo1` |
+- Public sign-up creates Community Members only, with a required default campus location. It
+  starts closed: a System Admin opens it per position in Setup › Positions.
+- Admins are created by other admins (People tab) or by the System Admin.
 
-These are synthetic, non-production accounts for demoing the app — not real identities. To
+Demo accounts already exist in the connected project. From the login card on the homepage, open
+"Try a demo account for each role" to sign in with one click, or sign in manually with the
+password `Sentinel!Demo1`:
+
+| Role | Email |
+| --- | --- |
+| Community Member (Student) | demo.student@sentinel.test |
+| Community Member (Non-Teaching Staff) | demo.nonteaching@sentinel.test |
+| School Admin (DRRM Coordinator) | demo.teacher@sentinel.test and demo.drrm@sentinel.test |
+| School Admin (Security) | demo.security@sentinel.test |
+| School Admin (Guidance Counselor) | demo.guidance@sentinel.test |
+| School Admin | demo.schooladmin@sentinel.test |
+| System Admin | demo.systemadmin@sentinel.test |
+
+`demo.teacher` currently holds the DRRM Coordinator position (and so the School Admin role). Assign it
+the Teacher position in the People tab if you want it to be a Community Member.
+
+These are synthetic, non-production accounts for demoing the app, not real identities. To
 (re)create them, run:
 
 ```bash
 node scripts/seed-sample-accounts.mjs
 ```
 
-The script is idempotent: re-running it re-syncs each demo account's role instead of duplicating
-users. It reads `demo-accounts.json` (in `src/`) and requires `SUPABASE_SERVICE_ROLE_KEY` in `.env`.
+The script is idempotent. It reads `src/demo-accounts.json`, marks accounts as admin-provisioned,
+and re-syncs each account's position and role. It requires `SUPABASE_SERVICE_ROLE_KEY` in `.env`.
+
+## Tests
+
+```bash
+npm test            # unit tests: roles, features, locations
+npm run test:db     # database acceptance tests; run in one transaction that always rolls back
+```
+
+`test:db` needs `SUPABASE_URL` and `SUPABASE_ACCESS_TOKEN` in `.env`. Results are in
+[docs/acceptance-test-results.md](docs/acceptance-test-results.md).
 
 ## Demo activity for the analytics
 

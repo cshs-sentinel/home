@@ -5,7 +5,7 @@ import type { Location } from '../lib/types';
 const LEVEL_LABELS = ['Campus', 'Building', 'Area', 'Room'];
 
 // Cascading dropdowns: each one lists only the places inside the choice above it.
-export function PlacePicker({ locations, initial, onPick, onSkip, actionLabel = 'Continue' }: { locations: Location[]; initial: string | null; onPick: (id: string) => void; onSkip: () => void; actionLabel?: string }) {
+export function PlacePicker({ locations, initial, onPick, onSkip, actionLabel = 'Continue', skipLabel = "Skip, I'm not sure where" }: { locations: Location[]; initial: string | null; onPick: (id: string) => void; onSkip?: () => void; actionLabel?: string; skipLabel?: string }) {
   const index = useMemo(() => childrenIndex(locations), [locations]);
   const roots = useMemo(() => sortByName(index.get(null) ?? []), [index]);
   const [path, setPath] = useState<string[]>(() => (initial ? pathTo(initial, locations).map((l) => l.id) : []));
@@ -33,9 +33,11 @@ export function PlacePicker({ locations, initial, onPick, onSkip, actionLabel = 
     return (
       <div className="place-picker">
         <p className="empty-note">No places have been set up yet.</p>
-        <button type="button" className="big-button primary" onClick={onSkip}>
-          Continue without a place
-        </button>
+        {onSkip && (
+          <button type="button" className="big-button primary" onClick={onSkip}>
+            Continue without a place
+          </button>
+        )}
       </div>
     );
   }
@@ -61,9 +63,11 @@ export function PlacePicker({ locations, initial, onPick, onSkip, actionLabel = 
       <button type="button" className="big-button primary" disabled={!selected} onClick={() => selected && onPick(selected)}>
         {actionLabel}
       </button>
-      <button type="button" className="big-button ghost" onClick={onSkip}>
-        Skip, I'm not sure where
-      </button>
+      {onSkip && (
+        <button type="button" className="big-button ghost" onClick={onSkip}>
+          {skipLabel}
+        </button>
+      )}
     </div>
   );
 }

@@ -6,8 +6,10 @@ export type Profile = {
   display_name: string | null;
   school_id: string | null;
   user_type_id: string | null;
+  primary_location_id: string | null;
 };
 
+// A designation (position). It maps to exactly one primary role.
 export type UserType = {
   id: string;
   name: string;
@@ -16,6 +18,8 @@ export type UserType = {
   features: string[];
   is_active: boolean;
   is_system: boolean;
+  selectable_at_signup: boolean;
+  authorized_privileged: boolean;
 };
 
 export type Environment = 'indoor' | 'outdoor' | 'covered';

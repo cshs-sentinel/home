@@ -1,8 +1,10 @@
 import type { Role, Tab } from '../roles';
 
 // Mirrors public.role_feature_ceiling / role_default_features in the database
-// (supabase/migrations/202610220003_school_setup.sql). The database rejects a
-// user type whose features exceed its base role, so keep these in sync.
+// (supabase/migrations/202610230011_three_roles_designations_registration.sql).
+// The database rejects a designation whose features exceed its primary role, so
+// keep these in sync. Features only shape menus and buttons; what a person may
+// read or change is enforced by row-level security on their primary role.
 
 export type Feature =
   | 'report.help'
@@ -26,7 +28,7 @@ export const FEATURE_GROUPS: { title: string; features: { key: Feature; label: s
     features: [
       { key: 'report.help', label: 'I need help', hint: 'Help request with location' },
       { key: 'report.safe', label: "I'm safe", hint: 'Safe check-in' },
-      { key: 'report.feeling', label: 'How I feel', hint: 'Feelings and stress, private to Guidance' },
+      { key: 'report.feeling', label: 'How I feel', hint: 'Feelings and stress, visible to School Admins' },
       { key: 'report.hazard', label: 'Report a hazard', hint: 'Unsafe condition, bullying, suspicious activity' },
       { key: 'report.incident', label: 'Report an incident', hint: 'Emergency, medical, security, other' },
       { key: 'report.observation', label: 'Suggest or observe', hint: 'Suggestions and concerns' },
@@ -36,13 +38,13 @@ export const FEATURE_GROUPS: { title: string; features: { key: Feature; label: s
     title: 'Menus',
     features: [
       { key: 'alerts.view', label: 'Alerts', hint: 'Weather and published alerts' },
-      { key: 'insights.view', label: 'Insights', hint: 'Decision cards, KPIs, and charts' },
+      { key: 'insights.view', label: 'Map and Analytics', hint: 'Decision cards, KPIs, and charts' },
       { key: 'queue.view', label: 'Queue', hint: 'Help requests, incidents, and reports to handle' },
       { key: 'alerts.draft', label: 'Draft alerts', hint: 'Write alerts for approval' },
       { key: 'alerts.approve', label: 'Approve alerts', hint: 'Approve, publish, and withdraw alerts' },
-      { key: 'people.manage', label: 'People', hint: 'Assign user types, view the activity log' },
+      { key: 'people.manage', label: 'People', hint: 'Assign positions, view the activity log' },
       { key: 'setup.locations', label: 'Setup: locations', hint: 'Campus, buildings, rooms, and location types' },
-      { key: 'setup.user_types', label: 'Setup: user types', hint: 'Create user types and choose their features' },
+      { key: 'setup.user_types', label: 'Setup: positions', hint: 'Create positions, choose their role and features' },
     ],
   },
 ];
@@ -50,12 +52,7 @@ export const FEATURE_GROUPS: { title: string; features: { key: Feature; label: s
 const REPORT: Feature[] = ['report.help', 'report.safe', 'report.feeling', 'report.hazard', 'report.incident', 'report.observation'];
 
 const CEILING: Record<Role, Feature[]> = {
-  student: [...REPORT, 'alerts.view'],
-  teacher: [...REPORT, 'alerts.view', 'insights.view', 'queue.view'],
-  non_teaching: [...REPORT, 'alerts.view'],
-  security: [...REPORT, 'alerts.view', 'insights.view', 'queue.view'],
-  drrm: [...REPORT, 'alerts.view', 'insights.view', 'queue.view', 'alerts.draft'],
-  guidance: [...REPORT, 'alerts.view', 'insights.view', 'queue.view'],
+  community: [...REPORT, 'alerts.view'],
   school_admin: [...REPORT, 'alerts.view', 'insights.view', 'queue.view', 'alerts.draft', 'alerts.approve', 'people.manage', 'setup.locations'],
   system_admin: [...REPORT, 'alerts.view', 'people.manage', 'setup.locations', 'setup.user_types'],
 };
@@ -71,7 +68,7 @@ export function defaultFeatures(role: Role): Feature[] {
 }
 
 // What a person can actually use: their type's features, never more than the
-// base role allows. People without a type get the role's defaults.
+// primary role allows. People without a position get the role's defaults.
 export function effectiveFeatures(role: Role, typeFeatures: string[] | null): Set<Feature> {
   const ceiling = new Set(CEILING[role]);
   const chosen = typeFeatures ?? defaultFeatures(role);

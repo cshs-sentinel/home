@@ -20,7 +20,7 @@ type Section = 'locations' | 'layout' | 'types' | 'userTypes';
 export function SetupPanel({ profile, features, people, onPeopleChanged }: { profile: Profile; features: Set<Feature>; people: Profile[]; onPeopleChanged: () => Promise<void> }) {
   const sections: { key: Section; label: string }[] = [
     ...(features.has('setup.locations') ? [{ key: 'locations' as const, label: 'Locations' }, { key: 'layout' as const, label: 'Map layout' }, { key: 'types' as const, label: 'Location types' }] : []),
-    ...(features.has('setup.user_types') ? [{ key: 'userTypes' as const, label: 'User types' }] : []),
+    ...(features.has('setup.user_types') ? [{ key: 'userTypes' as const, label: 'Positions' }] : []),
   ];
   const [section, setSection] = useState<Section>(sections[0]?.key ?? 'locations');
   const [data, setData] = useState<SetupData>({ locations: [], types: [], userTypes: [] });
@@ -425,7 +425,7 @@ function LocationTypeForm({ profile, type, inUse = false, onDone }: { profile: P
   );
 }
 
-// --- User types --------------------------------------------------------------
+// --- Positions (designations) --------------------------------------------------------------
 
 function UserTypesSetup({ profile, userTypes, people, onChanged }: { profile: Profile; userTypes: UserType[]; people: Profile[]; onChanged: () => Promise<void> }) {
   const [editing, setEditing] = useState<UserType | 'new' | null>(null);
@@ -436,11 +436,11 @@ function UserTypesSetup({ profile, userTypes, people, onChanged }: { profile: Pr
     <section>
       <div className="setup-head">
         <div>
-          <h2 className="section-title">User types</h2>
-          <p className="empty-note">Each user type is built on a base role. The base role decides what data the person can reach; the features decide which menus and report buttons they see.</p>
+          <h2 className="section-title">Positions</h2>
+          <p className="empty-note">Every position is mapped to one of three roles: Community Member, School Admin, or System Admin. The role decides what data a person can reach; the features decide which menus and report buttons they see. Only Community Member positions can be opened for public sign-up.</p>
         </div>
         <button type="button" className="action-small primary" onClick={() => setEditing('new')}>
-          + New user type
+          + New position
         </button>
       </div>
       {editing === 'new' && <UserTypeForm profile={profile} assigned={0} onDone={async (saved) => { setEditing(null); if (saved) await onChanged(); }} />}
@@ -452,10 +452,11 @@ function UserTypesSetup({ profile, userTypes, people, onChanged }: { profile: Pr
               <strong>
                 {t.name}
                 {t.is_system && <span className="chip chip-inline">built-in</span>}
+                {t.selectable_at_signup && <span className="chip chip-inline">sign-up</span>}
                 {!t.is_active && <span className="chip chip-inline">off</span>}
               </strong>
               <small>
-                Base role: {roleDetails[t.base_role].label} · {countFor(t.id)} {countFor(t.id) === 1 ? 'person' : 'people'} · {t.features.length} features
+                Role: {roleDetails[t.base_role].label} · {countFor(t.id)} {countFor(t.id) === 1 ? 'person' : 'people'} · {t.features.length} features
               </small>
               {t.description && <small>{t.description}</small>}
             </div>
@@ -477,16 +478,20 @@ function UserTypesSetup({ profile, userTypes, people, onChanged }: { profile: Pr
 function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; type?: UserType; assigned: number; onDone: (saved: boolean) => void }) {
   const [name, setName] = useState(type?.name ?? '');
   const [description, setDescription] = useState(type?.description ?? '');
-  const [baseRole, setBaseRole] = useState<Role>(type?.base_role ?? 'student');
-  const [chosen, setChosen] = useState<Set<string>>(new Set(type?.features ?? defaultFeatures('student')));
+  const [baseRole, setBaseRole] = useState<Role>(type?.base_role ?? 'community');
+  const [chosen, setChosen] = useState<Set<string>>(new Set(type?.features ?? defaultFeatures('community')));
   const [active, setActive] = useState(type?.is_active ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const allowed = new Set<string>(allowedFeatures(baseRole));
-  const roleLocked = Boolean(type?.is_system) || assigned > 0;
+  const [signup, setSignup] = useState(type?.selectable_at_signup ?? false);
+  const [authorized, setAuthorized] = useState(type?.authorized_privileged ?? false);
+  const roleChanged = Boolean(type) && baseRole !== type?.base_role;
 
   function changeRole(role: Role) {
     setBaseRole(role);
+    if (role !== 'community') setSignup(false);
+    if (role !== 'system_admin') setAuthorized(false);
     const ceiling = new Set<string>(allowedFeatures(role));
     setChosen(type ? new Set([...chosen].filter((f) => ceiling.has(f))) : new Set(defaultFeatures(role)));
   }
@@ -503,7 +508,7 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
   async function save() {
     setSaving(true);
     setError('');
-    const r = await saveUserType(profile, { id: type?.id, name, description, baseRole, features: [...chosen].filter((f) => allowed.has(f)), isActive: active });
+    const r = await saveUserType(profile, { id: type?.id, name, description, baseRole, features: [...chosen].filter((f) => allowed.has(f)), isActive: active, selectableAtSignup: signup, authorizedPrivileged: authorized });
     setSaving(false);
     if (r.error) setError(r.error);
     else onDone(true);
@@ -511,15 +516,15 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
 
   return (
     <div className="setup-form">
-      <p className="setup-form-title">{type ? `Edit ${type.name}` : 'New user type'}</p>
+      <p className="setup-form-title">{type ? `Edit ${type.name}` : 'New position'}</p>
       <div className="form-grid">
         <label className="field">
           Name
           <input value={name} maxLength={60} autoFocus onChange={(e) => setName(e.target.value)} placeholder="e.g. Canteen Staff, School Nurse" />
         </label>
         <label className="field">
-          Base role
-          <select className="role-select" value={baseRole} disabled={roleLocked} onChange={(e) => changeRole(e.target.value as Role)}>
+          Role
+          <select className="role-select" value={baseRole} onChange={(e) => changeRole(e.target.value as Role)}>
             {ROLE_ORDER.map((r) => (
               <option key={r} value={r}>
                 {roleDetails[r].label}
@@ -528,7 +533,21 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
           </select>
         </label>
       </div>
-      {roleLocked && <p className="fine-print">{type?.is_system ? 'Built-in types keep their base role.' : `The base role is locked while ${assigned} ${assigned === 1 ? 'person has' : 'people have'} this type.`}</p>}
+      {roleChanged && assigned > 0 && (
+        <p className="notice">
+          {assigned} {assigned === 1 ? 'person holds' : 'people hold'} this position and will move to {roleDetails[baseRole].label} when you save. The change is written to the activity log.
+        </p>
+      )}
+      {baseRole === 'system_admin' && (
+        <label className="check-row">
+          <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} /> I authorize this position to have full System Admin access
+        </label>
+      )}
+      {baseRole === 'community' && (
+        <label className="check-row">
+          <input type="checkbox" checked={signup} onChange={(e) => setSignup(e.target.checked)} /> Open for public sign-up
+        </label>
+      )}
       <label className="field">
         Description (optional)
         <input value={description} maxLength={300} onChange={(e) => setDescription(e.target.value)} placeholder="Who this type is for" />
@@ -552,7 +571,7 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
       ))}
       {!type?.is_system && (
         <label className="check-row">
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Can be assigned to people
+          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Can be assigned to people and chosen at sign-up
         </label>
       )}
       {error && (
@@ -561,7 +580,7 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
         </p>
       )}
       <div className="chip-row">
-        <button type="button" className="action-small primary" disabled={saving || name.trim().length < 2} onClick={save}>
+        <button type="button" className="action-small primary" disabled={saving || name.trim().length < 2 || (baseRole === 'system_admin' && !authorized)} onClick={save}>
           {saving ? 'Saving…' : 'Save'}
         </button>
         <button type="button" className="action-small" onClick={() => onDone(false)}>

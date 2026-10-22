@@ -67,11 +67,9 @@ export function AnalyticsPanel({ role, days, onDays, data, weather, quakes, weat
 
       <WeatherPanel weather={weather} quakes={quakes} error={weatherError} />
 
-      {role === 'guidance' && <GuidanceView sentiments={sentiments} reports={reports} days={days} data={data} />}
-      {role === 'teacher' && <TeacherView reports={reports} days={days} data={data} />}
-      {(role === 'security' || role === 'drrm' || role === 'school_admin') && (
-        <ResponderView role={role} reports={reports} incidents={incidents} days={days} data={data} />
-      )}
+      <OperationsView reports={reports} incidents={incidents} days={days} data={data} />
+      <h2 className="section-title">Wellbeing</h2>
+      <WellbeingView sentiments={sentiments} days={days} data={data} />
     </div>
   );
 }
@@ -93,7 +91,7 @@ function InsightCard({ insight, onDraftAlert }: { insight: Insight; onDraftAlert
   );
 }
 
-function GuidanceView({ sentiments, reports, days, data }: { sentiments: SchoolData['submissions']; reports: SchoolData['submissions']; days: number; data: SchoolData }) {
+function WellbeingView({ sentiments, days, data }: { sentiments: SchoolData['submissions']; days: number; data: SchoolData }) {
   const summary = sentimentSummary(sentiments);
   const stressDaily = dailyAverage(sentiments, days, (s) => s.created_at, (s) => s.stress_level);
   const moods = countBy(sentiments, (s) => s.sub_type);
@@ -111,50 +109,18 @@ function GuidanceView({ sentiments, reports, days, data }: { sentiments: SchoolD
         <ChartCard title="Average stress by day" subtitle="1 = very low, 5 = very high. Gaps are days with no check-ins." table={{ columns: ['Day', 'Average stress', 'Check-ins'], rows: stressDaily.map((d) => [d.date, d.value === null ? '—' : d.value.toFixed(2), d.n]) }}>
           <LineChart data={stressDaily.map((d) => ({ label: shortDay(d.date), value: d.value, detail: `${shortDay(d.date)} · ${d.n} check-in${d.n === 1 ? '' : 's'}` }))} yMin={1} yMax={5} />
         </ChartCard>
-        <ChartCard title="How students feel" subtitle="Feelings shared in this period" table={{ columns: ['Feeling', 'Count'], rows: moods.map((m) => [m.label, m.count]) }}>
+        <ChartCard title="How people feel" subtitle="Feelings shared in this period" table={{ columns: ['Feeling', 'Count'], rows: moods.map((m) => [m.label, m.count]) }}>
           <BarList data={moods} />
         </ChartCard>
         <ChartCard title="Where feelings were shared" subtitle="Places with the most check-ins" table={{ columns: ['Place', 'Count'], rows: places.map((p) => [p.label, p.count]) }}>
           <BarList data={places.slice(0, 8)} />
         </ChartCard>
-        <ChartCard title="Other reports" subtitle="Hazards and observations" table={{ columns: ['Type', 'Count'], rows: countBy(reports, (s) => s.sub_type).map((c) => [c.label, c.count]) }}>
-          <BarList data={countBy(reports, (s) => s.sub_type)} />
-        </ChartCard>
       </div>
     </>
   );
 }
 
-function TeacherView({ reports, days, data }: { reports: SchoolData['submissions']; days: number; data: SchoolData }) {
-  const open = data.submissions.filter((s) => s.kind !== 'sentiment' && s.status !== 'resolved').length;
-  const bullying = reports.filter((s) => s.sub_type === 'bullying').length;
-  const byType = countBy(reports, (s) => s.sub_type);
-  const places = hotspots(reports, data.locations);
-  const daily = dailyCount(reports, days, (s) => s.created_at);
-
-  return (
-    <>
-      <div className="kpi-row">
-        <StatTile label="Open reports" value={String(open)} severity={open > 5 ? 'warning' : 'good'} />
-        <StatTile label="Reports" value={String(reports.length)} sub={`last ${days} days`} />
-        <StatTile label="Bullying reports" value={String(bullying)} severity={bullying ? 'serious' : 'good'} sub={`last ${days} days`} />
-      </div>
-      <div className="chart-grid">
-        <ChartCard title="Reports per day" table={{ columns: ['Day', 'Reports'], rows: daily.map((d) => [d.date, d.n]) }}>
-          <ColumnChart data={daily.map((d) => ({ label: shortDay(d.date), value: d.n }))} />
-        </ChartCard>
-        <ChartCard title="Reports by type" table={{ columns: ['Type', 'Count'], rows: byType.map((c) => [c.label, c.count]) }}>
-          <BarList data={byType} />
-        </ChartCard>
-        <ChartCard title="Hotspots" subtitle="Places with the most reports" table={{ columns: ['Place', 'Reports'], rows: places.map((p) => [p.label, p.count]) }}>
-          <BarList data={places.slice(0, 8)} />
-        </ChartCard>
-      </div>
-    </>
-  );
-}
-
-function ResponderView({ role, reports, incidents, days, data }: { role: Role; reports: SchoolData['submissions']; incidents: SchoolData['incidents']; days: number; data: SchoolData }) {
+function OperationsView({ reports, incidents, days, data }: { reports: SchoolData['submissions']; incidents: SchoolData['incidents']; days: number; data: SchoolData }) {
   const summary = incidentSummary(data.incidents);
   const helpToday = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help').length;
   const openHazards = data.submissions.filter((s) => s.kind === 'incident_hazard' && s.status !== 'resolved').length;
@@ -172,7 +138,7 @@ function ResponderView({ role, reports, incidents, days, data }: { role: Role; r
         <StatTile label="Time to acknowledge" value={summary.medianAckMinutes === null ? '—' : `${Math.round(summary.medianAckMinutes)} min`} sub="median" />
         <StatTile label="Help requests" value={String(helpToday)} severity={helpToday ? 'critical' : 'good'} sub="last 24 hours" />
         <StatTile label="Open hazards" value={String(openHazards)} severity={openHazards ? 'warning' : 'good'} />
-        {role === 'school_admin' && wellbeingOpen !== undefined && <StatTile label="Open wellbeing reports" value={String(wellbeingOpen)} sub="count only; details are with Guidance" />}
+        <StatTile label="Open wellbeing reports" value={String(wellbeingOpen)} severity={wellbeingOpen ? 'warning' : 'good'} />
       </div>
       <div className="chart-grid">
         <ChartCard title="Reports and incidents per day" table={{ columns: ['Day', 'Count'], rows: daily.map((d) => [d.date, d.n]) }}>

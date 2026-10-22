@@ -49,7 +49,7 @@ export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; da
                   <strong>{p.display_name ?? 'Unnamed account'}</strong>
                   <small>
                     {p.id === profile.id ? 'You · ' : ''}
-                    {type?.name ?? 'No user type'} · base role {roleDetails[p.role].label}
+                    {type?.name ?? 'No position'} · {roleDetails[p.role].label}
                   </small>
                 </div>
                 {!locked && (
@@ -57,17 +57,17 @@ export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; da
                     className="role-select"
                     value={p.user_type_id ?? ''}
                     disabled={busy === p.id}
-                    aria-label={`User type for ${p.display_name ?? 'user'}`}
+                    aria-label={`Position for ${p.display_name ?? 'user'}`}
                     onChange={(e) => {
                       const next = typeById.get(e.target.value);
                       if (next) change(p, next);
                     }}
                   >
-                    {!type && <option value="">Choose a user type</option>}
+                    {!type && <option value="">Choose a position</option>}
                     {type && !assignable.includes(type) && <option value={type.id}>{type.name}</option>}
                     {assignable.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.name}
+                        {t.name} · {roleDetails[t.base_role].label}
                       </option>
                     ))}
                   </select>

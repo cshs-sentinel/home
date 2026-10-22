@@ -4,7 +4,6 @@ import { reviewSubmission, setIncidentPriority, transitionIncident, type SchoolD
 import { PRIORITY_FACTORS, PRIORITY_LEVELS, classifyPriority, type PriorityLevel } from '../lib/priority';
 import { locationName, OPEN_INCIDENT, since } from '../lib/analytics';
 import type { Incident, IncidentStatus, Submission } from '../lib/types';
-import type { Role } from '../roles';
 import { StatusChip } from './Charts';
 
 const NEXT_STEP: Partial<Record<IncidentStatus, { to: IncidentStatus; label: string }>> = {
@@ -15,9 +14,7 @@ const NEXT_STEP: Partial<Record<IncidentStatus, { to: IncidentStatus; label: str
   resolved: { to: 'closed', label: 'Close' },
 };
 
-const RESPONDERS: Role[] = ['security', 'drrm', 'school_admin'];
-
-export function QueuePanel({ role, data, onChanged }: { role: Role; data: SchoolData; onChanged: () => Promise<void> }) {
+export function QueuePanel({ data, onChanged }: { data: SchoolData; onChanged: () => Promise<void> }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
 
@@ -30,7 +27,6 @@ export function QueuePanel({ role, data, onChanged }: { role: Role; data: School
     setBusy(null);
   }
 
-  const isResponder = RESPONDERS.includes(role);
   const help = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help');
   const activeIncidents = data.incidents.filter((i) => OPEN_INCIDENT.includes(i.status) || i.status === 'resolved').sort(byPriority);
   const openSubmissions = data.submissions.filter((s) => s.status !== 'resolved');
@@ -45,8 +41,7 @@ export function QueuePanel({ role, data, onChanged }: { role: Role; data: School
         </p>
       )}
 
-      {isResponder && (
-        <section>
+      <section>
           <h2 className="section-title">Help requests · last 24 hours</h2>
           {help.length === 0 ? (
             <p className="empty-note">No one has asked for help.</p>
@@ -67,25 +62,21 @@ export function QueuePanel({ role, data, onChanged }: { role: Role; data: School
             </ul>
           )}
         </section>
-      )}
 
-      {isResponder && (
-        <section>
+      <section>
           <h2 className="section-title">Incidents</h2>
           {activeIncidents.length === 0 ? (
             <p className="empty-note">No open incidents.</p>
           ) : (
             <ul className="queue-list">
               {activeIncidents.map((i) => (
-                <IncidentRow key={i.id} incident={i} place={locationName(data.locations, i.location_id)} busy={busy === i.id} canCancel={role === 'school_admin'} onMove={(to, note) => run(i.id, () => transitionIncident(i.id, to, note))} onPriority={(sv, ug, af) => run(i.id, () => setIncidentPriority(i.id, sv, ug, af))} />
+                <IncidentRow key={i.id} incident={i} place={locationName(data.locations, i.location_id)} busy={busy === i.id} canCancel onMove={(to, note) => run(i.id, () => transitionIncident(i.id, to, note))} onPriority={(sv, ug, af) => run(i.id, () => setIncidentPriority(i.id, sv, ug, af))} />
               ))}
             </ul>
           )}
         </section>
-      )}
 
-      {role === 'guidance' && (
-        <section>
+      <section>
           <h2 className="section-title">Wellbeing follow-ups</h2>
           {followUps.length === 0 ? (
             <p className="empty-note">No open wellbeing reports.</p>
@@ -97,7 +88,6 @@ export function QueuePanel({ role, data, onChanged }: { role: Role; data: School
             </ul>
           )}
         </section>
-      )}
 
       <section>
         <h2 className="section-title">Hazard and safety reports</h2>

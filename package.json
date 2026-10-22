@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "deploy:preview": "npm run build && wrangler deploy"
+    "deploy:preview": "npm run build && wrangler deploy",
+    "test": "node --test tests/roles-features.test.ts",
+    "test:db": "node --test tests/database.test.mjs"
   },
   "repository": {
     "type": "git",

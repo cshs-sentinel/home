@@ -141,7 +141,7 @@ export function generateInsights(input: InsightInput): Insight[] {
   const { role, weather, quakes, submissions, incidents, checkIns, locations } = input;
   const now = input.now ?? Date.now();
   const out: Insight[] = [];
-  const canDraftAlerts = role === 'drrm' || role === 'school_admin';
+  const canDraftAlerts = role === 'school_admin';
 
   if (weather) {
     const peak = weather.peakToday;
@@ -189,7 +189,7 @@ export function generateInsights(input: InsightInput): Insight[] {
   const needHelp = since(checkIns, 1, (c) => c.checked_in_at, now)
     .filter((c) => c.status === 'need_help')
     .sort((a, b) => b.checked_in_at.localeCompare(a.checked_in_at));
-  if (needHelp.length && (role === 'security' || role === 'drrm' || role === 'school_admin')) {
+  if (needHelp.length && role === 'school_admin') {
     out.push({
       id: 'need-help',
       severity: 'critical',
@@ -227,11 +227,11 @@ export function generateInsights(input: InsightInput): Insight[] {
       id: 'bullying',
       severity: 'serious',
       title: `Bullying reports rose to ${bullyingNow} this week (from ${bullyingBefore})`,
-      detail: 'Coordinate with Guidance on a targeted anti-bullying session.',
+      detail: 'Consider a targeted anti-bullying session.',
     });
   }
 
-  if (role === 'guidance') {
+  if (role === 'school_admin') {
     const thisWeek = sentimentSummary(since(submissions, 7, (s) => s.created_at, now));
     const lastWeek = sentimentSummary(between(submissions, 14, 7, (s) => s.created_at, now));
     if (thisWeek.needsFollowUp.length) {
@@ -247,7 +247,7 @@ export function generateInsights(input: InsightInput): Insight[] {
         id: 'negative-share',
         severity: 'serious',
         title: `${Math.round((thisWeek.negativeShare ?? 0) * 100)}% of feelings shared this week are negative`,
-        detail: 'Consider a class-wide wellbeing activity or a short counseling drop-in. Ask the DRRM Coordinator or School Admin to post a wellbeing notice.',
+        detail: 'Consider a class-wide wellbeing activity or a short counseling drop-in. Consider posting a wellbeing notice.',
       });
     }
     if (thisWeek.avgStress !== null && lastWeek.avgStress !== null && thisWeek.avgStress - lastWeek.avgStress >= 0.5) {

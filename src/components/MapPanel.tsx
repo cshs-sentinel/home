@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { HAZARDS, INCIDENTS, NEGATIVE_EMOTIONS, OBSERVATIONS, iconFor, labelFor, type Option } from '../lib/catalog';
-import { fetchSentimentByLocation, type PlaceSentiment, type SchoolData } from '../lib/data';
+import type { SchoolData } from '../lib/data';
 import { blockOf, blockStyle, childrenIndex, pathTo, placeLabel, subtreeIds } from '../lib/layout';
 import { OPEN_INCIDENT, since } from '../lib/analytics';
 import type { Role } from '../roles';
@@ -12,17 +12,15 @@ type Layer = 'all' | 'incidents' | 'hazards' | 'concerns' | 'help' | 'sentiment'
 
 type Item = { id: string; locationId: string | null; icon: string; title: string; when: string; status: string; stress?: number };
 
-type Stats = { value: number | null; count: number; items: Item[] | null; suppressed?: boolean };
-
-const RESPONDERS: Role[] = ['security', 'drrm', 'school_admin'];
+type Stats = { value: number | null; count: number; items: Item[] | null };
 
 const LAYERS: { key: Layer; label: string; roles?: Role[] }[] = [
   { key: 'all', label: 'All reports' },
   { key: 'incidents', label: 'Incidents' },
   { key: 'hazards', label: 'Hazards' },
   { key: 'concerns', label: 'Concerns and suggestions' },
-  { key: 'help', label: 'Help requests', roles: RESPONDERS },
-  { key: 'sentiment', label: 'Sentiment', roles: ['guidance', 'school_admin'] },
+  { key: 'help', label: 'Help requests', roles: ['school_admin'] },
+  { key: 'sentiment', label: 'Sentiment', roles: ['school_admin'] },
 ];
 
 const TYPE_FILTERS: Partial<Record<Layer, Option[]>> = {
@@ -58,25 +56,6 @@ export function MapPanel({ role, days, onDays, data }: Props) {
   }, [index]);
   const [parentId, setParentId] = useState<string | null>(null);
   const currentId = parentId ?? startId;
-
-  // School Admins cannot read individual feelings, so their sentiment layer
-  // comes from the database's privacy-safe totals.
-  const aggregateSentiment = layer === 'sentiment' && role === 'school_admin';
-  const [placeSentiment, setPlaceSentiment] = useState<Map<string, PlaceSentiment> | null>(null);
-  const [sentimentError, setSentimentError] = useState('');
-  useEffect(() => {
-    if (!aggregateSentiment) return;
-    let cancelled = false;
-    setPlaceSentiment(null);
-    fetchSentimentByLocation(days).then((r) => {
-      if (cancelled) return;
-      setSentimentError(r.error ?? '');
-      setPlaceSentiment(new Map(r.data.map((row) => [row.location_id, row])));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [aggregateSentiment, days]);
 
   function chooseLayer(next: Layer) {
     setLayer(next);
@@ -121,10 +100,6 @@ export function MapPanel({ role, days, onDays, data }: Props) {
   }
 
   const statsFor = (placeId: string): Stats => {
-    if (aggregateSentiment) {
-      const row = placeSentiment?.get(placeId);
-      return row ? { value: row.avg_stress, count: row.entries, items: null } : { value: null, count: 0, items: null, suppressed: true };
-    }
     const ids = subtreeIds(placeId, index);
     const here = items.filter((i) => i.locationId && ids.has(i.locationId));
     if (layer === 'sentiment') {
@@ -154,14 +129,14 @@ export function MapPanel({ role, days, onDays, data }: Props) {
   };
   const shadedStats = [...(view === 'campus' ? leafStats : blockStats).values()];
   const shaded = isStress ? shadedStats.some((st) => st.value !== null) : shadedStats.some((st) => (st.value ?? 0) > 0);
-  const format = (s: Stats) => (s.suppressed ? 'too few' : s.value === null ? '—' : isStress ? s.value.toFixed(1) : String(s.value));
+  const format = (s: Stats) => (s.value === null ? '—' : isStress ? s.value.toFixed(1) : String(s.value));
   const unit = UNITS[layer];
   const directHere = items.filter((i) => i.locationId === currentId);
   const selectedLoc = selected ? locations.find((l) => l.id === selected) ?? null : null;
   const selectedStats = selectedLoc ? statsFor(selectedLoc.id) : null;
   const roots = (index.get(null) ?? []).filter((r) => (index.get(r.id) ?? []).length > 0);
-  const filters = layer === 'sentiment' && role === 'guidance' ? [{ value: 'negative', label: 'Negative feelings only', icon: '' }] : TYPE_FILTERS[layer];
-  const canOpenOnly = layer !== 'help' && !aggregateSentiment;
+  const filters = layer === 'sentiment' ? [{ value: 'negative', label: 'Negative feelings only', icon: '' }] : TYPE_FILTERS[layer];
+  const canOpenOnly = layer !== 'help';
   const go = (id: string) => {
     setParentId(id);
     setSelected(null);
@@ -235,13 +210,6 @@ export function MapPanel({ role, days, onDays, data }: Props) {
             </div>
           </div>
         )}
-
-        {aggregateSentiment && (
-          <p className="fine-print privacy-note">
-            Totals only. Places with fewer than 3 feelings, or where a small group could be worked out from the totals around it, show as "too few". Individual feelings stay with Guidance.
-          </p>
-        )}
-        {sentimentError && aggregateSentiment && <p className="error-text">{sentimentError}</p>}
 
         {roots.length > 1 && (view === 'campus' || path.length <= 1) && (
           <nav className="crumbs" aria-label="Campus">
@@ -321,7 +289,7 @@ export function MapPanel({ role, days, onDays, data }: Props) {
             <div className="map-detail-head">
               <strong>
                 {placeLabel(selectedLoc.id, locations)} · {format(selectedStats)} {unit}
-                {isStress && !selectedStats.suppressed && ` (${selectedStats.count} feelings)`}
+                {isStress && ` (${selectedStats.count} feelings)`}
               </strong>
               {(index.get(selectedLoc.id) ?? []).some((c) => blockOf(c)) && (
                 <button type="button" className="action-small" onClick={() => { setParentId(selectedLoc.id); setView('level'); setSelected(null); }}>
@@ -329,9 +297,7 @@ export function MapPanel({ role, days, onDays, data }: Props) {
                 </button>
               )}
             </div>
-            {selectedStats.items === null ? (
-              <p className="empty-note">{selectedStats.suppressed ? 'Too few feelings here to show without risking someone being identified.' : 'Totals only. Individual feelings stay with Guidance.'}</p>
-            ) : selectedStats.items.length === 0 ? (
+            {selectedStats.items === null || selectedStats.items.length === 0 ? (
               <p className="empty-note">Nothing here in this period.</p>
             ) : (
               <ul className="activity-list">
@@ -356,7 +322,7 @@ export function MapPanel({ role, days, onDays, data }: Props) {
           </div>
         )}
 
-        {view === 'level' && !aggregateSentiment && (unplaced.length > 0 || directHere.length > 0) && (
+        {view === 'level' && (unplaced.length > 0 || directHere.length > 0) && (
           <div className="chip-row map-extra">
             {directHere.length > 0 && <span className="chip">Filed at {current.name} itself: {directHere.length}</span>}
             {unplaced.map((k) => (
@@ -384,7 +350,7 @@ export function MapPanel({ role, days, onDays, data }: Props) {
                   <tr key={id}>
                     <td>{view === 'campus' ? placeLabel(id, locations) : locations.find((l) => l.id === id)?.name}</td>
                     <td>{format(stats)}</td>
-                    {isStress && <td>{stats.suppressed ? 'too few' : stats.count}</td>}
+                    {isStress && <td>{stats.count}</td>}
                   </tr>
                 );
               })}
