@@ -67,7 +67,7 @@ export function placeLabel(id: string | null, locations: Location[]): string {
   return shown.map((p) => p.name).join(' › ');
 }
 
-// Mirrors public.location_fits(): Campus > Building > Floor or wing > Room,
+// Mirrors public.location_fits(): Campus > Building > Area > Room,
 // and other locations (level 5) inside a campus, building, or floor.
 export function locationFits(childLevel: number, parentLevel: number | null): boolean {
   if (parentLevel === null) return childLevel === 1;

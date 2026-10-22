@@ -9,7 +9,7 @@ import { ROLE_ORDER, roleDetails, type Role } from '../roles';
 const LEVELS: Record<number, { label: string; tier: string; icon: string }> = {
   1: { label: 'Campus', tier: 'Overall', icon: '🏫' },
   2: { label: 'Building', tier: '1st level', icon: '🏢' },
-  3: { label: 'Floor or wing', tier: '2nd level', icon: '🧱' },
+  3: { label: 'Area', tier: '2nd level', icon: '🧱' },
   4: { label: 'Room', tier: '3rd level', icon: '🚪' },
   5: { label: 'Other location', tier: 'Inside a campus, building, or floor', icon: '📍' },
 };
@@ -314,7 +314,7 @@ function LocationTypesSetup({ profile, data, onChanged }: { profile: Profile; da
       <div className="setup-head">
         <div>
           <h2 className="section-title">Location types</h2>
-          <p className="empty-note">Campus › Building › Floor or wing › Room. Other locations (gates, fields, corridors, parking) can go inside a campus, building, or floor.</p>
+          <p className="empty-note">Campus › Building › Area › Room. Other locations (gates, fields, corridors, parking) can go inside a campus, building, or floor.</p>
         </div>
         <button type="button" className="action-small primary" onClick={() => setEditing('new')}>
           + Add type

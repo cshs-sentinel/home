@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { childrenIndex, pathTo, placeLabel } from '../lib/layout';
 import type { Location } from '../lib/types';
 
-const LEVEL_LABELS = ['Campus', 'Building or area', 'Floor, wing, or area', 'Room or area'];
+const LEVEL_LABELS = ['Campus', 'Building', 'Area', 'Room'];
 
 // Cascading dropdowns: each one lists only the places inside the choice above it.
 export function PlacePicker({ locations, initial, onPick, onSkip, actionLabel = 'Continue' }: { locations: Location[]; initial: string | null; onPick: (id: string) => void; onSkip: () => void; actionLabel?: string }) {

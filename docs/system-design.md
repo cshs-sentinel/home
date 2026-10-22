@@ -166,8 +166,8 @@ tier (`location_categories.level`):
 | --- | --- | --- | --- |
 | Campus (overall) | 1 | Top of the tree only | Campus |
 | Building (1st level) | 2 | A campus | Building |
-| Floor or wing (2nd level) | 3 | A building | Floor |
-| Room (3rd level) | 4 | A floor or wing | Room, Classroom, Laboratory, Library, Office, Clinic, Canteen, CR (Comfort Room) |
+| Area (2nd level) | 3 | A building | Floor, Wing, Annex |
+| Room (3rd level) | 4 | An area | Room, Classroom, Laboratory, Library, Office, Clinic, Canteen, CR (Comfort Room) |
 | Other location | 5 | A campus, building, or floor | Gate, Parking, Sports Field, Covered Court, Garden, Corridor, Lobby |
 
 Rules, enforced by the database (`validate_location`, using `location_fits()`, migration `0005`):
@@ -308,7 +308,7 @@ The Report tab opens with six large buttons:
 | Suggest or observe | Type (3) → Place → Send | `submissions` kind `observation` |
 
 The place step (`PlacePicker`) is a set of cascading dropdowns that follows the location tiers:
-Campus, then Building or area, then Floor, wing, or area, then Room or area. Each dropdown lists
+Campus, then Building, then Area, then Room. Each dropdown lists
 only the places inside the choice above it, so nobody scrolls a flat list of every room. With one
 campus it is pre-selected. "Anywhere in …" stops at the current level, and the review shows the
 full path (for example "Admin › 1st Floor › Room 101"). A Skip button sends without a place.
