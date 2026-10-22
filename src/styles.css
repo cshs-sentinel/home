@@ -1,6 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {
+  --font-body: 'Space Grotesk', system-ui, sans-serif;
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
   --bg: #f6f8f7;
   --surface: #ffffff;
   --text: #17354d;
@@ -32,7 +35,7 @@
   --input-bg: #ffffff;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   color-scheme: light;
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
   color: var(--text);
   background: var(--bg);
 }
@@ -117,7 +120,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; }
-button { font: inherit; cursor: pointer; transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease), letter-spacing 0.45s var(--ease); }
+button { font: inherit; font-family: var(--font-mono); font-size: 13px; cursor: pointer; transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease), letter-spacing 0.45s var(--ease); }
 
 header {
   height: 72px;
@@ -129,7 +132,7 @@ header {
   padding: 0 28px;
 }
 .header-actions { display: flex; align-items: center; gap: 14px; }
-.brand { font-size: 19px; font-weight: 700; letter-spacing: .11em; color: var(--brand); text-decoration: none; }
+.brand { font-family: var(--font-mono); font-size: 18px; font-weight: 700; letter-spacing: .16em; color: var(--brand); text-decoration: none; }
 .brand span { color: var(--logo-mark); font-size: 25px; vertical-align: -2px; }
 
 .theme-toggle {
@@ -149,10 +152,10 @@ header {
   padding: 90px max(28px, calc((100% - 1030px) / 2)) 70px;
   background: radial-gradient(circle at 85% 12%, var(--hero-glow) 0, transparent 28%), linear-gradient(116deg, var(--hero-from), var(--hero-to));
 }
-.hero h1 { font-family: Fraunces, serif; font-size: clamp(40px, 5.5vw, 64px); line-height: 1.05; letter-spacing: -.035em; max-width: 760px; margin: 0; color: var(--heading); }
+.hero h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(38px, 5.2vw, 60px); line-height: 1.08; letter-spacing: -.03em; max-width: 760px; margin: 0; color: var(--heading); }
 .lede { font-size: 18px; max-width: 560px; line-height: 1.6; color: var(--muted); margin: 22px 0 0; }
 
-.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .15em; color: var(--eyebrow); margin: 0 0 15px; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .18em; color: var(--eyebrow); margin: 0 0 15px; }
 
 .access { max-width: 1100px; margin: 0 auto; padding: 56px 28px 90px; }
 :root[data-theme="neon"] .access {
@@ -160,9 +163,9 @@ header {
 }
 
 .login-card { max-width: 440px; padding: 34px; border-radius: 14px; background: var(--surface); box-shadow: var(--card-shadow); animation: rise 0.7s var(--ease) both; }
-.login-card h3 { font-family: Fraunces, serif; font-size: 26px; margin: 0 0 20px; }
+.login-card h3 { font-family: var(--font-display); font-weight: 700; font-size: 24px; letter-spacing: -.01em; margin: 0 0 20px; }
 .login-card form label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
-.login-card input { width: 100%; padding: 10px 12px; margin-top: 6px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: var(--input-bg); color: var(--text); }
+.login-card input { font-family: var(--font-mono); width: 100%; padding: 10px 12px; margin-top: 6px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: var(--input-bg); color: var(--text); }
 .login-card form button { position: relative; border: 0; border-radius: 5px; background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 12px 20px; margin-top: 4px; }
 .login-card form button:hover:not(:disabled) { transform: scale(1.02); letter-spacing: .02em; }
 .login-card form button:disabled { opacity: .6; cursor: default; }
@@ -189,7 +192,7 @@ header {
 
 .dashboard { display: grid; grid-template-columns: 78px 1fr 280px; gap: 26px; padding: 34px; border-radius: 14px; background: var(--surface); box-shadow: var(--card-shadow); animation: rise 0.7s var(--ease) both; }
 .role-symbol { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 17px; background: var(--icon-bg); color: var(--icon-ink); font-size: 28px; }
-.dashboard h3 { font-family: Fraunces, serif; font-size: 28px; line-height: 1.15; margin: 0 0 20px; }
+.dashboard h3 { font-family: var(--font-display); font-weight: 700; font-size: 26px; line-height: 1.2; letter-spacing: -.015em; margin: 0 0 20px; }
 .dashboard ul { padding: 0; margin: 0; list-style: none; color: var(--list-muted); line-height: 2; }
 .dashboard li { animation: rise 0.6s var(--ease) both; }
 .dashboard li:nth-child(1) { animation-delay: 0.1s; }
@@ -199,7 +202,7 @@ header {
 .dashboard li:nth-child(5) { animation-delay: 0.34s; }
 .dashboard li:before { content: '✓'; color: var(--tick); font-weight: bold; margin-right: 9px; }
 .dashboard aside { border-left: 1px solid var(--line); padding-left: 25px; display: flex; align-items: flex-start; flex-direction: column; }
-.status { font-size: 11px; color: var(--status-ink); background: var(--status-bg); padding: 5px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.status { font-family: var(--font-mono); font-size: 11px; color: var(--status-ink); background: var(--status-bg); padding: 5px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .dashboard aside strong { font-size: 18px; margin-top: 13px; }
 .dashboard aside p { color: var(--card-muted); font-size: 13px; }
 .fine-print { font-size: 11px; color: var(--fine); margin-top: 10px; }
