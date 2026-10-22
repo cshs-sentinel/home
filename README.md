@@ -1,6 +1,14 @@
 # SENTINEL
 
-An instant survey system: respondents submit answers and the server analyzes results in real time.
+A school safety and wellbeing app. Students and staff report how they feel, hazards, incidents,
+and help requests in a few taps on their phone. SENTINEL combines those reports with live weather,
+heat index, and earthquake data, and gives admins and coordinators a campus heatmap, analytics,
+and suggested actions such as drafting an alert. Each role sees only what it needs, and individual
+feelings stay with Guidance.
+
+Live preview: https://sentinel-school-safety-preview.sentinelcshs.workers.dev
+
+See [docs/system-design.md](docs/system-design.md) for the full design, roles, and known gaps.
 
 ## Repository setup
 

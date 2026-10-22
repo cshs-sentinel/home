@@ -1,7 +1,7 @@
 {
   "name": "sentinel",
   "version": "1.0.0",
-  "description": "An instant survey system: respondents submit answers and the server analyzes results in real time.",
+  "description": "School safety and wellbeing app: tap-to-report feelings, hazards, incidents, and help requests, combined with weather and heat-index data into a campus heatmap and role-based analytics.",
   "private": true,
   "type": "module",
   "scripts": {
