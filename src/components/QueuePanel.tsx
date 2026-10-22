@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { CRISIS_EMOTIONS, iconFor, labelFor } from '../lib/catalog';
-import { reviewSubmission, transitionIncident, type SchoolData } from '../lib/data';
+import { reviewSubmission, setIncidentPriority, transitionIncident, type SchoolData } from '../lib/data';
+import { PRIORITY_FACTORS, PRIORITY_LEVELS, classifyPriority, type PriorityLevel } from '../lib/priority';
 import { locationName, OPEN_INCIDENT, since } from '../lib/analytics';
 import type { Incident, IncidentStatus, Submission } from '../lib/types';
 import type { Role } from '../roles';
@@ -31,7 +32,7 @@ export function QueuePanel({ role, data, onChanged }: { role: Role; data: School
 
   const isResponder = RESPONDERS.includes(role);
   const help = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help');
-  const activeIncidents = data.incidents.filter((i) => OPEN_INCIDENT.includes(i.status) || i.status === 'resolved');
+  const activeIncidents = data.incidents.filter((i) => OPEN_INCIDENT.includes(i.status) || i.status === 'resolved').sort(byPriority);
   const openSubmissions = data.submissions.filter((s) => s.status !== 'resolved');
   const followUps = openSubmissions.filter((s) => s.kind === 'sentiment').sort(urgencyFirst);
   const reports = openSubmissions.filter((s) => s.kind !== 'sentiment');
@@ -76,7 +77,7 @@ export function QueuePanel({ role, data, onChanged }: { role: Role; data: School
           ) : (
             <ul className="queue-list">
               {activeIncidents.map((i) => (
-                <IncidentRow key={i.id} incident={i} place={locationName(data.locations, i.location_id)} busy={busy === i.id} canCancel={role === 'school_admin'} onMove={(to, note) => run(i.id, () => transitionIncident(i.id, to, note))} />
+                <IncidentRow key={i.id} incident={i} place={locationName(data.locations, i.location_id)} busy={busy === i.id} canCancel={role === 'school_admin'} onMove={(to, note) => run(i.id, () => transitionIncident(i.id, to, note))} onPriority={(sv, ug, af) => run(i.id, () => setIncidentPriority(i.id, sv, ug, af))} />
               ))}
             </ul>
           )}
@@ -114,8 +115,9 @@ export function QueuePanel({ role, data, onChanged }: { role: Role; data: School
   );
 }
 
-function IncidentRow({ incident, place, busy, canCancel, onMove }: { incident: Incident; place: string; busy: boolean; canCancel: boolean; onMove: (to: IncidentStatus, note?: string) => void }) {
+function IncidentRow({ incident, place, busy, canCancel, onMove, onPriority }: { incident: Incident; place: string; busy: boolean; canCancel: boolean; onMove: (to: IncidentStatus, note?: string) => void; onPriority: (severity: number, urgency: number, affected: number) => Promise<void> }) {
   const next = NEXT_STEP[incident.status];
+  const [rating, setRating] = useState(false);
   return (
     <li className={`queue-item${incident.status === 'new' ? ' urgent' : ''}`}>
       <span className="queue-icon" aria-hidden="true">{iconFor(incident.category)}</span>
@@ -127,6 +129,7 @@ function IncidentRow({ incident, place, busy, canCancel, onMove }: { incident: I
           {place} · {timeAgo(incident.created_at)}
         </small>
       </div>
+      <PriorityChip level={incident.priority_level} index={incident.priority_index} />
       <span className={`chip status-${incident.status}`}>{incident.status.replace('_', ' ')}</span>
       <div className="queue-actions">
         {next && (
@@ -134,13 +137,96 @@ function IncidentRow({ incident, place, busy, canCancel, onMove }: { incident: I
             {next.label}
           </button>
         )}
+        <button type="button" className="action-small" disabled={busy} aria-expanded={rating} onClick={() => setRating((r) => !r)}>
+          {incident.priority_index === null ? 'Set priority' : 'Change priority'}
+        </button>
         {canCancel && OPEN_INCIDENT.includes(incident.status) && (
           <button type="button" className="action-small" disabled={busy} onClick={() => onMove('cancelled', 'Cancelled by School Admin')}>
             Cancel
           </button>
         )}
       </div>
+      {rating && (
+        <PriorityRater
+          incident={incident}
+          busy={busy}
+          onCancel={() => setRating(false)}
+          onSave={async (s, u, a) => {
+            await onPriority(s, u, a);
+            setRating(false);
+          }}
+        />
+      )}
     </li>
+  );
+}
+
+export function PriorityChip({ level, index }: { level: PriorityLevel | null; index: number | null }) {
+  if (!level || index === null) return <span className="chip priority-chip is-unrated">Not rated</span>;
+  const p = PRIORITY_LEVELS[level];
+  return (
+    <span className="chip priority-chip" style={{ '--priority': p.color } as CSSProperties} title={`Priority Index ${index} of 12 · ${p.label} (${p.range})`}>
+      <span className="priority-dot" aria-hidden="true" />
+      {p.label} · {index}
+    </span>
+  );
+}
+
+function PriorityRater({ incident, busy, onSave, onCancel }: { incident: Incident; busy: boolean; onSave: (s: number, u: number, a: number) => Promise<void>; onCancel: () => void }) {
+  const [values, setValues] = useState({
+    severity: incident.priority_severity ?? 0,
+    urgency: incident.priority_urgency ?? 0,
+    affected: incident.priority_affected ?? 0,
+  });
+  const complete = values.severity > 0 && values.urgency > 0 && values.affected > 0;
+  const total = values.severity + values.urgency + values.affected;
+  const level = complete ? classifyPriority(total) : null;
+
+  return (
+    <div className="priority-rater">
+      <p className="priority-formula">Priority Index = Severity + Urgency + Affected population</p>
+      {PRIORITY_FACTORS.map((factor) => (
+        <div key={factor.key} className="priority-factor" role="radiogroup" aria-label={factor.label}>
+          <span className="control-label">{factor.label}</span>
+          <div className="priority-scale">
+            {factor.scale.map((label, i) => {
+              const score = i + 1;
+              const selected = values[factor.key] === score;
+              return (
+                <button
+                  type="button"
+                  key={score}
+                  role="radio"
+                  aria-checked={selected}
+                  className={`priority-option${selected ? ' is-active' : ''}`}
+                  onClick={() => setValues((v) => ({ ...v, [factor.key]: score }))}
+                >
+                  <strong>{score}</strong>
+                  <span>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+      <div className="priority-result" aria-live="polite">
+        {complete ? (
+          <>
+            Total {total} of 12 · <PriorityChip level={level} index={total} />
+          </>
+        ) : (
+          'Choose a score for each factor.'
+        )}
+      </div>
+      <div className="chip-row">
+        <button type="button" className="action-small primary" disabled={!complete || busy} onClick={() => onSave(values.severity, values.urgency, values.affected)}>
+          {busy ? 'Saving…' : 'Save priority'}
+        </button>
+        <button type="button" className="action-small" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -173,6 +259,14 @@ function SubmissionRow({ submission, place, busy, onReview }: { submission: Subm
       </div>
     </li>
   );
+}
+
+// Highest Priority Index first. Unrated incidents sit just below High so they
+// get noticed and rated without burying anything High or Critical; ties go to
+// whichever has waited longest.
+function byPriority(a: Incident, b: Incident): number {
+  const rank = (i: Incident) => i.priority_index ?? 8.5;
+  return rank(b) - rank(a) || a.created_at.localeCompare(b.created_at);
 }
 
 function isUrgent(s: Submission): boolean {

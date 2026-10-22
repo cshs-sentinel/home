@@ -47,7 +47,7 @@ export function useSchoolData(profile: Profile) {
         : Promise.resolve({ data: [], error: null }),
       supabase
         .from('incidents')
-        .select('id, case_ref, category, description, status, location_id, created_by, created_at, acknowledged_at, resolved_at')
+        .select('id, case_ref, category, description, status, location_id, created_by, created_at, acknowledged_at, resolved_at, priority_severity, priority_urgency, priority_affected, priority_index, priority_level')
         .gte('created_at', sinceIso)
         .order('created_at', { ascending: false })
         .limit(1000),
@@ -179,6 +179,11 @@ export async function checkIn(profile: Profile, status: 'safe' | 'need_help', lo
 
 export async function transitionIncident(id: string, status: string, note?: string): Promise<Result> {
   const { error } = await supabase.rpc('transition_incident', { incident_id: id, new_status: status, note: note ?? null });
+  return toResult(error);
+}
+
+export async function setIncidentPriority(id: string, severity: number, urgency: number, affected: number): Promise<Result> {
+  const { error } = await supabase.rpc('set_incident_priority', { p_incident_id: id, p_severity: severity, p_urgency: urgency, p_affected: affected });
   return toResult(error);
 }
 

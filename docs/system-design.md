@@ -84,7 +84,7 @@ flowchart LR
 | Theme | `src/theme.ts` | Light, Dark, and Neon themes |
 | Demo accounts | `scripts/seed-sample-accounts.mjs` | One login per role |
 | Demo activity | `scripts/seed-demo-activity.mjs` | 14 days of synthetic, tagged activity; `--clean` removes it |
-| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types; `0004` adds map layout fields; `0005` sets the Campus › Building › Floor › Room hierarchy; `0006` adds privacy-safe sentiment totals |
+| Migrations | `supabase/migrations/` | `0001` is superseded (see gaps); `0002` fixes alert approval; `0003` adds location levels and user types; `0004` adds map layout fields; `0005` sets the Campus › Building › Floor › Room hierarchy; `0006` adds privacy-safe sentiment totals; `0007` adds the incident Priority Index |
 
 ## 4. Data model
 
@@ -96,7 +96,7 @@ All tables are in `public`, have RLS enabled, and are scoped by `school_id`.
 | `user_types` | Admin-defined user types per school | `base_role`, `features`, `is_active`, `is_system` for the 8 built-in types |
 | `submissions` | Feelings, hazards, and observations | `kind`: `sentiment` (sub-types joy, calm, worried, stressed, sad, angry, lonely, hopeless; plus `stress_level` 1–5), `incident_hazard` (unsafe_condition, bullying, suspicious_activity), `observation` (safety_concern, report, suggestion). Status new → acknowledged → resolved |
 | `check_ins` | Location check-ins | `status`: `safe` or `need_help` |
-| `incidents` | Cases with a generated `case_ref` (`SNT-YYYY-NNNN`) | Category: emergency, medical, security, other. Status new → acknowledged → assigned → in_progress → resolved → closed, or cancelled |
+| `incidents` | Cases with a generated `case_ref` (`SNT-YYYY-NNNN`) | Category: emergency, medical, security, other. Status new → acknowledged → assigned → in_progress → resolved → closed, or cancelled. Priority factors and the generated `priority_index` / `priority_level` |
 | `incident_notifications` | One row per new incident, created by a trigger | Read by reviewers |
 | `alerts` | Announcements | Severity info, advisory, urgent. Target everyone, responders, or one role. Status draft → approved → published, or cancelled / corrected |
 | `location_categories` | Location types, such as Building, Room, or CR | `level` (tier) 1–5 and `environment` |
@@ -316,6 +316,42 @@ full path (for example "Admin › 1st Floor › Room 101"). A Skip button sends 
 Each flow ends with a summary, a single large Send button, and
 a short note on who can see the report. On phones, tap targets are at least 48 px, choices use
 a 2-column grid, and the role tabs sit in a bottom bar.
+
+### Incident Priority Index
+
+Responders rate each incident so the Queue shows the most serious ones first.
+
+    Priority Index = Severity + Urgency + Affected Population
+
+Each factor is a whole number from 1 to 4:
+
+| Factor | 1 | 2 | 3 | 4 |
+| --- | --- | --- | --- | --- |
+| Severity | Minor | Moderate | Serious | Life-threatening |
+| Urgency | Can wait | Today | Within the hour | Immediate |
+| Affected population | One person | A few (2–10) | A class (11–50) | Many (50+) |
+
+| Total | Class | Color |
+| --- | --- | --- |
+| 3–5 | Low | #16A34A |
+| 6–8 | Moderate | #2563EB |
+| 9–11 | High | #EA580C |
+| 12 | Critical | #DC2626 |
+
+How it works (migration `0007`):
+
+- The three factors are stored on `incidents`. `priority_index` and `priority_level` are generated
+  columns, so the formula and ranges live only in the database.
+- `set_incident_priority(incident, severity, urgency, affected)` is the only way to set them. It
+  allows Security, DRRM, and School Admin in the incident's school, refuses closed or cancelled
+  incidents and values outside 1–4, records who set it and when, and writes an
+  `incident_prioritized` audit entry.
+- In the Queue each incident shows a priority chip (colored dot and tint plus the class name and
+  number, so it never relies on color alone) and a **Set priority** / **Change priority** button.
+  The panel has three 1–4 scales and a live total before saving.
+- Incidents are sorted by Priority Index, highest first. Unrated incidents sit just below High so
+  they get rated without hiding anything High or Critical; ties go to whoever waited longest.
+- Reporting is unchanged: reporters do not rate priority.
 
 ## 8. Analytics and decision support
 

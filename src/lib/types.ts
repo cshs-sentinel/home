@@ -79,6 +79,11 @@ export type Incident = {
   created_at: string;
   acknowledged_at: string | null;
   resolved_at: string | null;
+  priority_severity: number | null;
+  priority_urgency: number | null;
+  priority_affected: number | null;
+  priority_index: number | null;
+  priority_level: 'low' | 'moderate' | 'high' | 'critical' | null;
 };
 
 export type CheckIn = {
