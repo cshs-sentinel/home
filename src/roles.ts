@@ -10,104 +10,65 @@ export type Role =
   | 'school_admin'
   | 'system_admin';
 
-export const ROLE_ORDER: Role[] = [
-  'student',
-  'teacher',
-  'non_teaching',
-  'security',
-  'drrm',
-  'guidance',
-  'school_admin',
-  'system_admin',
-];
+export type Tab = 'report' | 'insights' | 'queue' | 'alerts' | 'people';
 
-export const roleDetails: Record<Role, { label: string; icon: string; summary: string; actions: string[] }> = {
+export const ROLE_ORDER: Role[] = ['student', 'teacher', 'non_teaching', 'security', 'drrm', 'guidance', 'school_admin', 'system_admin'];
+
+export const TAB_LABELS: Record<Tab, { label: string; icon: string }> = {
+  report: { label: 'Report', icon: '✚' },
+  insights: { label: 'Insights', icon: '◔' },
+  queue: { label: 'Queue', icon: '☰' },
+  alerts: { label: 'Alerts', icon: '📣' },
+  people: { label: 'People', icon: '👥' },
+};
+
+export const roleDetails: Record<Role, { label: string; icon: string; summary: string; tabs: Tab[] }> = {
   student: {
     label: 'Student',
     icon: '◉',
-    summary: 'Speak up about safety and wellbeing, and follow your own reports.',
-    actions: [
-      'Answer a school climate survey',
-      'Report a hazard or incident',
-      "Check in on how you're feeling",
-      'Track the status of your own reports',
-      'View alerts for your role',
-    ],
+    summary: 'Tell us how you feel or report something unsafe in a few taps.',
+    tabs: ['report', 'alerts'],
   },
   teacher: {
     label: 'Teacher',
     icon: '✎',
-    summary: 'Report concerns and help triage non-confidential student submissions.',
-    actions: [
-      'Report a hazard or incident',
-      'Review non-confidential student submissions',
-      'Update a report you can see',
-      'View alerts for your role',
-    ],
+    summary: 'Report concerns and triage non-confidential reports from your school.',
+    tabs: ['report', 'insights', 'queue', 'alerts'],
   },
   non_teaching: {
     label: 'Non-Teaching Staff',
     icon: '◇',
-    summary: 'Support staff with the same reporting access as the wider school community.',
-    actions: [
-      'Report a hazard or incident',
-      'Answer a school climate survey',
-      'View approved alerts and announcements',
-    ],
+    summary: 'Report concerns and stay informed with school alerts.',
+    tabs: ['report', 'alerts'],
   },
   security: {
     label: 'Security',
     icon: '▣',
-    summary: 'First responder for incidents — acknowledge, assign, and track.',
-    actions: [
-      'Acknowledge and assign incoming incidents',
-      'Review all incident and check-in activity',
-      'Add internal notes to a case',
-      'Receive responder-only alerts',
-    ],
+    summary: 'Respond to incidents and help requests as they come in.',
+    tabs: ['insights', 'queue', 'report', 'alerts'],
   },
   drrm: {
     label: 'DRRM Coordinator',
     icon: '⌁',
-    summary: 'Coordinate disaster-risk reduction response and keep leadership informed.',
-    actions: [
-      'Review all incidents and check-ins school-wide',
-      'Draft an alert for school-leader approval',
-      'Monitor non-confidential survey trends',
-      'Add internal notes and assign cases',
-    ],
+    summary: 'Watch hazards, weather, and incidents, and draft alerts for approval.',
+    tabs: ['insights', 'queue', 'alerts', 'report'],
   },
   guidance: {
     label: 'Guidance Counselor',
     icon: '❖',
-    summary: 'Confidential access to wellbeing submissions, kept separate from general staff.',
-    actions: [
-      'Review confidential wellbeing submissions',
-      'Respond to and resolve wellbeing cases',
-      'Track your own caseload',
-      'View alerts for your role',
-    ],
+    summary: 'Confidential view of how students feel, with follow-ups that need you.',
+    tabs: ['insights', 'queue', 'report', 'alerts'],
   },
   school_admin: {
     label: 'School Admin',
     icon: '◆',
-    summary: "Full operational authority: approvals, access, and the school's configuration.",
-    actions: [
-      'Approve and publish alerts',
-      'Manage accounts and role assignments',
-      'Configure locations, categories, and schedules',
-      'Review the school audit log',
-      'See every incident, check-in, and submission',
-    ],
+    summary: 'See the whole picture and approve what the school is told.',
+    tabs: ['insights', 'queue', 'alerts', 'people', 'report'],
   },
   system_admin: {
     label: 'System Admin',
     icon: '▦',
-    summary: 'Technical administration across schools, without access to confidential content.',
-    actions: [
-      'Review the audit log',
-      'Support account and access issues',
-      'Escalate confidential cases to Guidance or the School Admin',
-    ],
+    summary: 'Manage accounts and review the audit trail.',
+    tabs: ['people', 'report'],
   },
 };

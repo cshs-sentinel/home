@@ -47,14 +47,16 @@ audit log.
 
 ## System Admin
 
-Scoped technical administration. Today this role can read the audit log; it intentionally does
-not have Guidance's confidential-content access or School Admin's incident/alert/location
-management rights.
+Scoped technical administration. This role can change roles (including granting System Admin)
+and read the audit log. It intentionally does not have Guidance's confidential-content access or
+School Admin's incident, alert, and location management rights.
 
 ## Notes for contributors
 
-- Role assignment happens by updating `profiles.role` directly (as a School Admin or via the
-  service-role key) — there is no separate `user_roles`/audit-trigger table in the live schema,
-  unlike an earlier draft of this repo's migration.
+- Roles are changed in the app's People tab, which calls `admin_set_user_role()`. School and
+  System Admins can change roles in their own school, cannot change their own role, and only a
+  System Admin can grant System Admin. Every change is written to `audit_logs`. There is no
+  separate `user_roles` table in the live schema, unlike an earlier draft of this repo's migration.
+- See [system-design.md](system-design.md) for the features and insights each role gets.
 - `scripts/seed-sample-accounts.mjs` creates one demo login per role (see the project README) so
   every role above can be signed into and previewed without touching real accounts.

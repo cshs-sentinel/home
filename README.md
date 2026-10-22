@@ -44,3 +44,24 @@ node scripts/seed-sample-accounts.mjs
 
 The script is idempotent: re-running it re-syncs each demo account's role instead of duplicating
 users. It reads `demo-accounts.json` (in `src/`) and requires `SUPABASE_SERVICE_ROLE_KEY` in `.env`.
+
+## Demo activity for the analytics
+
+The demo school has 14 days of synthetic feelings, reports, incidents, and check-ins so the
+insights and charts have something to show. Every row is tagged `[demo]`.
+
+```bash
+node scripts/seed-demo-activity.mjs
+```
+
+```bash
+node scripts/seed-demo-activity.mjs --clean
+```
+
+## Weather and heat index
+
+Weather comes from Open-Meteo and earthquakes from USGS, using the school's coordinates. Set
+`VITE_SCHOOL_LAT`, `VITE_SCHOOL_LON`, and `VITE_SCHOOL_PLACE` in `.env`. Without them the app
+uses Manila and says so on screen.
+
+See [docs/system-design.md](docs/system-design.md) for the features, insight rules, and known gaps.
