@@ -880,3 +880,64 @@ button:active:not(:disabled) .stress-button strong {
 .filter-row, .segmented { box-shadow: var(--nm-inset); border: 0; background: var(--surface); padding: 4px; }
 .segmented .filter-button { box-shadow: none; background: none; }
 .segmented .filter-button.is-active { background: none; box-shadow: var(--nm-raise-sm); color: var(--heading); }
+
+/* --- Signed-out sign-in screen: brand panel beside a white login form ------------ */
+.auth-shell { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: 100vh; background: #ffffff; }
+.auth-brand {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; gap: 16px;
+  padding: 64px 56px; color: #ffffff;
+  background: linear-gradient(165deg, #0d2d52 0%, #0a2443 60%, #071a33 100%);
+}
+.auth-brand::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 42%; pointer-events: none;
+  background: linear-gradient(to top, rgba(3, 12, 24, 0.7), transparent);
+}
+.auth-brand > * { position: relative; z-index: 1; }
+.auth-brand-row { display: flex; align-items: center; gap: 16px; }
+.auth-logo { width: 62px; height: 70px; flex: none; }
+.auth-wordmark { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 46px; letter-spacing: 0.02em; color: #ffffff; }
+.auth-tagline { margin: 0; max-width: 340px; font-size: 16px; line-height: 1.55; color: #e6edf5; }
+.auth-rule { display: block; width: 56px; height: 1px; background: rgba(255, 255, 255, 0.55); margin: 6px 0; }
+.auth-motto { margin: 0; font-style: italic; font-size: 14px; color: #d4deea; }
+
+.auth-panel {
+  position: relative; display: flex; flex-direction: column; justify-content: center; padding: 64px 56px;
+  background: #ffffff; color: #0f2a4a;
+  --text: #0f2a4a; --heading: #0f2a4a; --muted: #5b6b7d; --link: #1f5fa8; --surface: #ffffff;
+  --input-bg: #ffffff; --border-strong: #d6dde6;
+}
+.auth-panel-inner { width: 100%; max-width: 380px; margin: 0 auto; }
+.auth-panel h3 { margin: 0 0 6px; text-align: center; font-family: var(--font-display); font-size: 30px; font-weight: 800; color: #0f2a4a; letter-spacing: -0.01em; }
+.auth-sub { margin: 0 0 28px; text-align: center; font-size: 14px; color: #5b6b7d; }
+.auth-panel .login-card { max-width: none; padding: 0; background: transparent; box-shadow: none; border-radius: 0; animation: none; }
+.auth-panel .login-card form label { color: #5b6b7d; font-size: 13px; margin-bottom: 16px; }
+.auth-panel .login-card input {
+  width: 100%; margin-top: 6px; padding: 13px 14px; border: 1px solid #d6dde6; border-radius: 8px;
+  background: #ffffff; color: #0f2a4a; box-shadow: none; font-size: 15px;
+}
+.auth-panel .login-card input:focus-visible { outline: 2px solid #1f5fa8; outline-offset: 1px; }
+.auth-panel .login-card form button {
+  width: 100%; margin-top: 8px; padding: 14px 20px; border: 0; border-radius: 8px;
+  background: #f26a1d; color: #ffffff; font-weight: 700; font-size: 16px; box-shadow: none;
+}
+.auth-panel .login-card form button:hover:not(:disabled) { background: #e05c12; transform: none; }
+.auth-panel .login-card .error-text { color: #b3261e; }
+.auth-panel .login-card .link-button { color: #1f5fa8; text-align: center; padding-top: 18px; }
+.auth-panel .demo-accounts { display: none; }
+.auth-panel .signup-card, .auth-panel .login-card + p { color: #5b6b7d; }
+.auth-theme { position: absolute; top: 20px; right: 20px; }
+
+@media (max-width: 860px) {
+  .auth-shell { grid-template-columns: 1fr; min-height: auto; }
+  .auth-brand { padding: 40px 24px; gap: 12px; }
+  .auth-wordmark { font-size: 36px; }
+  .auth-tagline { font-size: 14px; }
+  .auth-panel { padding: 28px 24px 56px; }
+  .auth-theme { position: static; align-self: flex-end; margin-bottom: 8px; }
+}
+.auth-panel .link-button { box-shadow: none; background: none; border-radius: 0; }
+.auth-panel .link-button:hover:not(:disabled) { transform: none; letter-spacing: normal; text-decoration: underline; }
+.auth-brand-row { color: inherit; text-decoration: none; }
+.auth-brand-row:focus-visible { outline: 2px solid #ffffff; outline-offset: 6px; border-radius: 8px; }
+.brand { display: inline-flex; align-items: center; gap: 8px; }
+.brand-logo { width: 24px; height: 27px; flex: none; }

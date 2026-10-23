@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { roleDetails, TAB_LABELS, type Role, type Tab } from './roles';
@@ -111,8 +111,8 @@ function LoginCard({ onSignUp }: { onSignUp: () => void }) {
 
   return (
     <article className="login-card">
-      <p className="eyebrow">SIGN IN</p>
-      <h3>Access your SENTINEL dashboard</h3>
+      <h3>Welcome Back!</h3>
+      <p className="auth-sub">Log in to your account to continue.</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -129,7 +129,7 @@ function LoginCard({ onSignUp }: { onSignUp: () => void }) {
         </label>
         {error && <p className="error-text">{error}</p>}
         <button type="submit" disabled={submitting}>
-          {submitting ? 'Signing in…' : 'Log in'}
+          {submitting ? 'Signing in…' : 'Login'}
         </button>
       </form>
       <button type="button" className="link-button" onClick={onSignUp}>
@@ -299,15 +299,61 @@ function urgentCount(role: Role, data: SchoolData): number {
   return 0;
 }
 
+// Signed-out landing page: a brand panel (logo, name, tagline) beside the sign-in form.
+// The logo is drawn as SVG so it stays sharp at any size.
+function SentinelLogo({ className = "auth-logo" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 64 72" aria-hidden="true">
+      <defs>
+        <linearGradient id="sentinel-shield" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f9914a" />
+          <stop offset="1" stopColor="#e4531c" />
+        </linearGradient>
+      </defs>
+      <path d="M32 2 L60 12 V34 C60 52 47 64 32 70 C17 64 4 52 4 34 V12 Z" fill="url(#sentinel-shield)" stroke="#ffffff" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M32 19 C26 27 22 33 22 40 C22 47 26 52 32 52 C38 52 42 47 42 40 C42 33 38 27 32 19 Z" fill="#ffffff" />
+      <path d="M32 33 C29 38 28 41 28 44 C28 47 30 49 32 49 C34 49 36 47 36 44 C36 41 35 38 32 33 Z" fill="#f58a3d" />
+    </svg>
+  );
+}
+
+function SignedOutScreen({ themeButton }: { themeButton: ReactNode }) {
+  return (
+    <main className="auth-shell">
+      <aside className="auth-brand">
+        <a className="auth-brand-row" href="/" aria-label="SENTINEL sign-in page">
+          <SentinelLogo />
+          <span className="auth-wordmark">SENTINEL</span>
+        </a>
+        <p className="auth-tagline">Smart Emergency Network for Tracking Incidents, Notifications, Evaluation, and Logistics</p>
+        <span className="auth-rule" aria-hidden="true" />
+        <p className="auth-motto">Safe and Motivating Learning Environment.</p>
+      </aside>
+      <section className="auth-panel">
+        {themeButton}
+        <div className="auth-panel-inner">
+          <AuthCards />
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export function App() {
   const { session, profile, schoolName, userType, status, refreshProfile } = useAuth();
   const { theme, cycleTheme } = useTheme();
+  const themeButton = (
+    <button type="button" className="theme-toggle auth-theme" onClick={cycleTheme} aria-label={`Theme: ${THEME_LABELS[theme]}. Switch theme`}>
+      <span aria-hidden="true">◐</span> {THEME_LABELS[theme]}
+    </button>
+  );
+  if (status === 'ready' && !session) return <SignedOutScreen themeButton={themeButton} />;
 
   return (
     <main className={session ? 'signed-in' : undefined}>
       <header>
         <a className="brand" href="#top">
-          <span>◈</span> SENTINEL
+          <SentinelLogo className="brand-logo" /> SENTINEL
         </a>
         <div className="header-actions">
           <button type="button" className="theme-toggle" onClick={cycleTheme} aria-label={`Theme: ${THEME_LABELS[theme]}. Switch theme`}>
