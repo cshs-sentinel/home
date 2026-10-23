@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { approveRegistration, fetchPendingInMyLocation, rejectRegistration, type PendingNearby } from '../lib/data';
+import { PendingList } from './PendingList';
 import { timeAgo } from './QueuePanel';
 
 // What a Classroom Adviser sees on the People tab: only the Community
@@ -25,23 +26,22 @@ export function MyLocationApprovals() {
     load();
   }, []);
 
-  async function decide(person: PendingNearby, approve: boolean) {
-    setBusy(person.id);
+  async function decide(id: string, approve: boolean) {
+    const person = pending.find((p) => p.id === id);
+    setBusy(id);
     setMessage('');
-    const r = approve ? await approveRegistration(person.id) : await rejectRegistration(person.id);
+    const r = approve ? await approveRegistration(id) : await rejectRegistration(id);
     if (!r.error) await load();
     setBusy(null);
-    setMessage(r.error ?? (approve ? `${person.display_name ?? 'This account'} is approved.` : `${person.display_name ?? 'This account'} was declined.`));
+    const name = person?.display_name ?? 'This account';
+    setMessage(r.error ?? (approve ? `${name} is approved.` : `${name} was declined.`));
   }
 
   return (
     <div className="people">
-      <section>
-        <h2 className="section-title">Waiting for approval at your location</h2>
-        <p className="fine-print">
-          As a Classroom Adviser you approve Community Member sign-ups only for your own default location. Change it from Report ›
-          My default location if it isn't right.
-        </p>
+      <section className="card">
+        <h2 className="section-title">Waiting for approval</h2>
+        <p className="fine-print">Sign-ups at your default place. Change your place in My Reports.</p>
         {error && <p className="error-text">{error}</p>}
         {message && <p className="notice">{message}</p>}
         {loading ? (
@@ -49,25 +49,7 @@ export function MyLocationApprovals() {
         ) : pending.length === 0 ? (
           <p className="empty-note">Nobody is waiting right now.</p>
         ) : (
-          <ul className="queue-list">
-            {pending.map((p) => (
-              <li key={p.id} className="queue-item">
-                <span className="queue-icon" aria-hidden="true">◉</span>
-                <div className="queue-main">
-                  <strong>{p.display_name ?? 'Unnamed account'}</strong>
-                  <small>{p.designation ?? 'No position'} · {timeAgo(p.created_at)}</small>
-                </div>
-                <div className="queue-actions">
-                  <button type="button" className="action-small primary" disabled={busy === p.id} onClick={() => decide(p, true)}>
-                    Approve
-                  </button>
-                  <button type="button" className="action-small" disabled={busy === p.id} onClick={() => decide(p, false)}>
-                    Decline
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <PendingList people={pending.map((p) => ({ id: p.id, name: p.display_name, detail: `${p.designation ?? 'No position'} · ${timeAgo(p.created_at)}` }))} busy={busy} onDecide={decide} />
         )}
       </section>
     </div>

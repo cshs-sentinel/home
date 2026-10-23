@@ -1,15 +1,16 @@
-import { useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { CRISIS_EMOTIONS, TRIAGE_LABELS, iconFor, labelFor } from '../lib/catalog';
 import { reviewSubmission, setIncidentPriority, transitionIncident, triageHelp, type SchoolData } from '../lib/data';
 import { PRIORITY_FACTORS, PRIORITY_LEVELS, classifyPriority, type PriorityLevel } from '../lib/priority';
 import { locationName, OPEN_INCIDENT, since } from '../lib/analytics';
 import type { CheckIn, Incident, IncidentStatus, Submission } from '../lib/types';
 import { StatusChip } from './Charts';
+import { INCIDENT_STATUS_LABEL } from './MyReportsPanel';
 
 const NEXT_STEP: Partial<Record<IncidentStatus, { to: IncidentStatus; label: string }>> = {
   pending_evaluation: { to: 'acknowledged', label: 'Validate' },
   new: { to: 'acknowledged', label: 'Acknowledge' },
-  acknowledged: { to: 'assigned', label: 'Take it' },
+  acknowledged: { to: 'assigned', label: 'Assign to me' },
   assigned: { to: 'in_progress', label: 'Start' },
   in_progress: { to: 'resolved', label: 'Resolve' },
   resolved: { to: 'closed', label: 'Close' },
@@ -45,62 +46,49 @@ export function QueuePanel({ data, onChanged }: { data: SchoolData; onChanged: (
         </p>
       )}
 
-      <section>
-          <h2 className="section-title">Help requests · last 24 hours</h2>
-          {help.length === 0 ? (
-            <p className="empty-note">No one has asked for help.</p>
-          ) : (
-            <ul className="queue-list">
-              {help.map((c) => (
-                <HelpRow key={c.id} help={c} place={locationName(data.locations, c.location_id)} busy={busy === c.id} onTriage={(to) => run(c.id, () => triageHelp(c.id, to))} />
-              ))}
-            </ul>
-          )}
-        </section>
+      <QueueSection title="Help requests" note="last 24 hours" count={help.length}>
+        {help.map((c) => (
+          <HelpRow key={c.id} help={c} place={locationName(data.locations, c.location_id)} busy={busy === c.id} onTriage={(to) => run(c.id, () => triageHelp(c.id, to))} />
+        ))}
+      </QueueSection>
 
-      <section>
-          <h2 className="section-title">Incidents{waiting > 0 ? ` · ${waiting} waiting for evaluation` : ''}</h2>
-          {activeIncidents.length === 0 ? (
-            <p className="empty-note">No open incidents.</p>
-          ) : (
-            <ul className="queue-list">
-              {activeIncidents.map((i) => (
-                <IncidentRow key={i.id} incident={i} place={locationName(data.locations, i.location_id)} busy={busy === i.id} canCancel onMove={(to, note) => run(i.id, () => transitionIncident(i.id, to, note))} onPriority={(sv, ug, af) => run(i.id, () => setIncidentPriority(i.id, sv, ug, af))} />
-              ))}
-            </ul>
-          )}
-        </section>
+      <QueueSection title="Incidents" note={waiting > 0 ? `${waiting} waiting for evaluation` : undefined} count={activeIncidents.length}>
+        {activeIncidents.map((i) => (
+          <IncidentRow key={i.id} incident={i} place={locationName(data.locations, i.location_id)} busy={busy === i.id} onMove={(to, note) => run(i.id, () => transitionIncident(i.id, to, note))} onPriority={(sv, ug, af) => run(i.id, () => setIncidentPriority(i.id, sv, ug, af))} />
+        ))}
+      </QueueSection>
 
-      <section>
-          <h2 className="section-title">Wellbeing follow-ups</h2>
-          {followUps.length === 0 ? (
-            <p className="empty-note">No open wellbeing reports.</p>
-          ) : (
-            <ul className="queue-list">
-              {followUps.map((s) => (
-                <SubmissionRow key={s.id} submission={s} place={locationName(data.locations, s.location_id)} busy={busy === s.id} onReview={(to) => run(s.id, () => reviewSubmission(s.id, to))} />
-              ))}
-            </ul>
-          )}
-        </section>
+      <QueueSection title="Wellbeing follow-ups" count={followUps.length}>
+        {followUps.map((s) => (
+          <SubmissionRow key={s.id} submission={s} place={locationName(data.locations, s.location_id)} busy={busy === s.id} onReview={(to) => run(s.id, () => reviewSubmission(s.id, to))} />
+        ))}
+      </QueueSection>
 
-      <section>
-        <h2 className="section-title">Hazard and safety reports</h2>
-        {reports.length === 0 ? (
-          <p className="empty-note">No open reports.</p>
-        ) : (
-          <ul className="queue-list">
-            {reports.map((s) => (
-              <SubmissionRow key={s.id} submission={s} place={locationName(data.locations, s.location_id)} busy={busy === s.id} onReview={(to) => run(s.id, () => reviewSubmission(s.id, to))} />
-            ))}
-          </ul>
-        )}
-      </section>
+      <QueueSection title="Concerns and suggestions" count={reports.length}>
+        {reports.map((s) => (
+          <SubmissionRow key={s.id} submission={s} place={locationName(data.locations, s.location_id)} busy={busy === s.id} onReview={(to) => run(s.id, () => reviewSubmission(s.id, to))} />
+        ))}
+      </QueueSection>
     </div>
   );
 }
 
-function IncidentRow({ incident, place, busy, canCancel, onMove, onPriority }: { incident: Incident; place: string; busy: boolean; canCancel: boolean; onMove: (to: IncidentStatus, note?: string) => void; onPriority: (severity: number, urgency: number, affected: number) => Promise<void> }) {
+// A titled list with its count. An empty section shrinks to a single line.
+function QueueSection({ title, note, count, children }: { title: string; note?: string; count: number; children: ReactNode }) {
+  return (
+    <section className={`card queue-section${count === 0 ? ' is-empty' : ''}`}>
+      <div className="card-head">
+        <h2 className="section-title">
+          {title} <span className="count">{count}</span>
+        </h2>
+        {count === 0 ? <span className="muted">Nothing open</span> : note && <span className="muted">{note}</span>}
+      </div>
+      {count > 0 && <ul className="queue-list">{children}</ul>}
+    </section>
+  );
+}
+
+function IncidentRow({ incident, place, busy, onMove, onPriority }: { incident: Incident; place: string; busy: boolean; onMove: (to: IncidentStatus, note?: string) => void; onPriority: (severity: number, urgency: number, affected: number) => Promise<void> }) {
   const next = NEXT_STEP[incident.status];
   const [rating, setRating] = useState(false);
   return (
@@ -115,7 +103,7 @@ function IncidentRow({ incident, place, busy, canCancel, onMove, onPriority }: {
         </small>
       </div>
       <PriorityChip level={incident.priority_level} index={incident.priority_index} auto={incident.priority_set_by === null} />
-      <span className={`chip status-${incident.status}`}>{incident.status.replace(/_/g, ' ')}</span>
+      <span className={`chip status-${incident.status}`}>{INCIDENT_STATUS_LABEL[incident.status]}</span>
       <div className="queue-actions">
         {next && (
           <button type="button" className="action-small primary" disabled={busy} onClick={() => onMove(next.to, next.to === 'resolved' ? 'Resolved from queue' : undefined)}>
@@ -123,10 +111,10 @@ function IncidentRow({ incident, place, busy, canCancel, onMove, onPriority }: {
           </button>
         )}
         <button type="button" className="action-small" disabled={busy} aria-expanded={rating} onClick={() => setRating((r) => !r)}>
-          {incident.priority_index === null ? 'Set priority' : 'Change priority'}
+          {incident.priority_index === null ? 'Set priority' : 'Priority'}
         </button>
-        {canCancel && OPEN_INCIDENT.includes(incident.status) && (
-          <button type="button" className="action-small" disabled={busy} onClick={() => onMove('cancelled', incident.status === 'pending_evaluation' ? 'Dismissed after evaluation' : 'Cancelled by School Admin')}>
+        {OPEN_INCIDENT.includes(incident.status) && (
+          <button type="button" className="text-button quiet-link" disabled={busy} onClick={() => onMove('cancelled', incident.status === 'pending_evaluation' ? 'Dismissed after evaluation' : 'Cancelled by School Admin')}>
             {incident.status === 'pending_evaluation' ? 'Dismiss' : 'Cancel'}
           </button>
         )}

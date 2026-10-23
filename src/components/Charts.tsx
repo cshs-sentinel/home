@@ -12,18 +12,22 @@ export function StatusChip({ severity, label }: { severity: Severity | 'info'; l
   );
 }
 
+// A number and its label. A status chip appears only when something needs
+// attention, so a calm dashboard stays quiet.
 export function StatTile({ label, value, sub, severity }: { label: string; value: string; sub?: string; severity?: Severity }) {
   return (
-    <div className="stat-tile">
+    <div className={`stat-tile${severity && severity !== 'good' ? ` sev-${severity}` : ''}`}>
       <span className="stat-label">{label}</span>
       <strong className="stat-value">{value}</strong>
-      {severity && <StatusChip severity={severity} />}
+      {severity && severity !== 'good' && <StatusChip severity={severity} />}
       {sub && <span className="stat-sub">{sub}</span>}
     </div>
   );
 }
 
-export function ChartCard({ title, subtitle, children, table }: { title: string; subtitle?: string; children: ReactNode; table?: { columns: string[]; rows: (string | number)[][] } }) {
+// `showTable` comes from one page-level "Show data tables" switch instead of a
+// toggle on every chart.
+export function ChartCard({ title, subtitle, children, table, showTable = false }: { title: string; subtitle?: string; children: ReactNode; table?: { columns: string[]; rows: (string | number)[][] }; showTable?: boolean }) {
   return (
     <section className="chart-card">
       <header>
@@ -31,9 +35,8 @@ export function ChartCard({ title, subtitle, children, table }: { title: string;
         {subtitle && <p>{subtitle}</p>}
       </header>
       {children}
-      {table && table.rows.length > 0 && (
-        <details className="table-view">
-          <summary>View as table</summary>
+      {showTable && table && table.rows.length > 0 && (
+        <div className="table-view">
           <table>
             <thead>
               <tr>
@@ -54,7 +57,7 @@ export function ChartCard({ title, subtitle, children, table }: { title: string;
               ))}
             </tbody>
           </table>
-        </details>
+        </div>
       )}
     </section>
   );

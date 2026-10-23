@@ -1,40 +1,47 @@
 import { useEffect, useState } from 'react';
 import { HELP_TYPES, INCIDENT_CATEGORIES, type Option } from '../lib/catalog';
-import { checkIn, raiseIncident } from '../lib/data';
+import { checkIn, raiseIncident, sendSubmission } from '../lib/data';
 import { placeLabel } from '../lib/layout';
 import type { Location, Profile } from '../lib/types';
 import { CategoryGrid } from './CategoryGrid';
 import { ConfirmReportDialog } from './ConfirmReportDialog';
 
-type Kind = 'incident' | 'help';
+export type QuickKind = 'incident' | 'help' | 'suggestion';
 
 const SAFE: Option = { value: 'safe', label: "I'm safe", icon: '✅' };
+const SUGGESTION: Option = { value: 'suggestion', label: 'Suggestion', icon: '💡' };
 
 type Done = { title: string; detail: string };
 
-// One tap on a category, one confirmation, done. Used for both Report an
-// Incident and Get Help: the only differences are the buttons and what is saved.
+const INTRO: Record<QuickKind, { title: string; hint: string }> = {
+  incident: { title: 'What do you want to report?', hint: 'Tap what you saw, then confirm the place.' },
+  help: { title: 'What kind of help do you need?', hint: 'Tap what you need, then confirm where you are.' },
+  suggestion: { title: 'Share an idea or concern', hint: 'Not urgent? Tell the school team what could be better.' },
+};
+
+// One tap on a category, one confirmation, done. Used for Report an Incident,
+// Get Help, and Suggestion: the only differences are the buttons and what is saved.
 export function QuickReport({
   kind,
   profile,
   locations,
-  preset,
+  preset = null,
   onPresetUsed,
-  showSafe,
+  showSafe = false,
   onSent,
   onSeeReports,
 }: {
-  kind: Kind;
+  kind: QuickKind;
   profile: Profile;
   locations: Location[];
   /** a category value to open straight away (for example from "Need Support") */
-  preset: string | null;
-  onPresetUsed: () => void;
-  showSafe: boolean;
+  preset?: string | null;
+  onPresetUsed?: () => void;
+  showSafe?: boolean;
   onSent: () => void;
-  onSeeReports: () => void;
+  onSeeReports?: () => void;
 }) {
-  const options = kind === 'incident' ? INCIDENT_CATEGORIES : HELP_TYPES;
+  const options = kind === 'incident' ? INCIDENT_CATEGORIES : kind === 'help' ? HELP_TYPES : [];
   const [picked, setPicked] = useState<Option | null>(null);
   const [done, setDone] = useState<Done | null>(null);
 
@@ -42,7 +49,7 @@ export function QuickReport({
     if (!preset) return;
     const match = options.find((o) => o.value === preset);
     if (match) setPicked(match);
-    onPresetUsed();
+    onPresetUsed?.();
   }, [preset, options, onPresetUsed]);
 
   async function send(option: Option, locationId: string, note: string): Promise<string | null> {
@@ -51,23 +58,21 @@ export function QuickReport({
       const r = await checkIn(profile, 'safe', locationId);
       if (r.error) return r.error;
       finish({ title: 'Thanks for checking in', detail: `You are marked safe at ${place}.` });
+    } else if (option.value === 'suggestion') {
+      const r = await sendSubmission(profile, { kind: 'observation', subType: 'suggestion', locationId, message: note });
+      if (r.error) return r.error;
+      finish({ title: 'Thanks for the suggestion', detail: 'The school team will read it.' });
     } else if (kind === 'incident') {
       const description = `${option.label} reported at ${place} using quick report.${note ? `\n\nDetail: ${note}` : ''}`;
       const r = await raiseIncident(profile, { category: option.value, locationId, description });
       if (r.error) return r.error;
-      finish({
-        title: `Report ${r.caseRef ?? ''} sent`.replace('  ', ' '),
-        detail: `${option.label} at ${place}. Status: Pending evaluation. An authorized School Admin has been notified to review it. You can follow it under My Reports.`,
-      });
+      finish({ title: 'Report sent', detail: `${r.caseRef ? `${r.caseRef} · ` : ''}A School Admin will review it.` });
     } else {
       const r = await checkIn(profile, 'need_help', locationId, option.value);
       if (r.error) return r.error;
       finish({
         title: 'Help request sent',
-        detail:
-          r.triage === 'urgent'
-            ? `${option.label} at ${place} is marked urgent and responders can see it now. If you are in danger, go to the nearest teacher or staff member.`
-            : `${option.label} at ${place} is with the safety team and will be triaged. You can follow it under My Reports.`,
+        detail: r.triage === 'urgent' ? 'Help is on the way. If you are in danger, go to the nearest teacher now.' : 'The safety team will get back to you.',
       });
     }
     return null;
@@ -89,43 +94,49 @@ export function QuickReport({
           <button type="button" className="big-button primary" onClick={() => setDone(null)}>
             Done
           </button>
-          <button type="button" className="big-button ghost" onClick={onSeeReports}>
-            See My Reports
-          </button>
+          {onSeeReports && (
+            <button type="button" className="text-button" onClick={onSeeReports}>
+              See My Reports
+            </button>
+          )}
         </div>
       </section>
     );
   }
 
-  const defaultId = profile.primary_location_id;
+  const intro = INTRO[kind];
 
   return (
     <section className="quick-report">
-      <h2 className="flow-question">{kind === 'incident' ? 'What do you want to report?' : 'What kind of help do you need?'}</h2>
-      <p className="fine-print">
-        {kind === 'incident'
-          ? 'Tap what you saw. You will confirm the place before anything is sent.'
-          : 'Tap what you need. You will confirm where you are before anything is sent. If you are in danger, tell the nearest teacher or staff member too.'}
-      </p>
-      <CategoryGrid options={options} label={kind === 'incident' ? 'Incident categories' : 'Help categories'} tone={kind === 'incident' ? 'warn' : 'danger'} onSelect={setPicked} />
+      <h2 className="flow-question">{intro.title}</h2>
+      <p className="fine-print">{intro.hint}</p>
 
+      {kind === 'suggestion' ? (
+        <button type="button" className="big-button primary" onClick={() => setPicked(SUGGESTION)}>
+          💡 Write a suggestion
+        </button>
+      ) : (
+        <CategoryGrid options={options} label={kind === 'incident' ? 'Incident categories' : 'Help categories'} tone={kind === 'incident' ? 'warn' : 'danger'} onSelect={setPicked} />
+      )}
+
+      {kind === 'incident' && (
+        <button type="button" className="text-button quiet-link" onClick={() => setPicked(SUGGESTION)}>
+          Not urgent? Send a suggestion instead
+        </button>
+      )}
       {kind === 'help' && showSafe && (
-        <div className="safe-row">
-          <p className="fine-print">Not asking for help? Let your school know you are fine.</p>
-          <button type="button" className="action-small" onClick={() => setPicked(SAFE)}>
-            ✅ I'm safe
-          </button>
-        </div>
+        <button type="button" className="text-button quiet-link" onClick={() => setPicked(SAFE)}>
+          ✅ Not asking for help? Check in as safe
+        </button>
       )}
 
       {picked && (
         <ConfirmReportDialog
-          heading={picked.value === 'safe' ? 'Check in' : kind === 'incident' ? 'Report an incident' : 'Get help'}
           option={picked}
           locations={locations}
-          defaultLocationId={defaultId}
-          confirmLabel={picked.value === 'safe' ? 'Confirm check-in' : kind === 'incident' ? 'Confirm Report' : 'Confirm Help Request'}
-          allowNote={kind === 'incident' && picked.value !== 'safe'}
+          defaultLocationId={profile.primary_location_id}
+          confirmLabel={picked.value === 'safe' ? 'Check in' : picked.value === 'suggestion' ? 'Send' : kind === 'incident' ? 'Confirm Report' : 'Confirm Help Request'}
+          note={picked.value === 'suggestion' ? 'required' : kind === 'incident' && picked.value !== 'safe' ? 'optional' : 'none'}
           onConfirm={(locationId, note) => send(picked, locationId, note)}
           onCancel={() => setPicked(null)}
         />

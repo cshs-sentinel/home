@@ -5,29 +5,30 @@ import { ALL_INCIDENT_CATEGORIES, CRISIS_EMOTIONS, FEELINGS, HELP_INITIAL_TRIAGE
 import { DEFAULT_PRIORITY, PRIORITY_LEVELS, classifyPriority, defaultPriorityFor } from '../src/lib/priority.ts';
 import { TAB_LABELS } from '../src/roles.ts';
 
-test('a Community Member gets exactly the four big-button tabs, with My Reports behind More', () => {
+test('a Community Member gets the five big-button tabs, with short names and full page titles', () => {
   const nav = navFor(effectiveFeatures('community', null), true);
-  assert.deepEqual(nav.primary, ['feel', 'incident', 'help', 'know']);
-  assert.deepEqual(nav.more, ['mine']);
+  assert.deepEqual(nav, ['feel', 'incident', 'help', 'know', 'mine']);
   assert.deepEqual(
-    nav.primary.map((t) => TAB_LABELS[t].label),
-    ['Tell Us How You Feel', 'Report an Incident', 'Get Help', 'Things You Need to Know Now'],
+    nav.map((t) => TAB_LABELS[t].label),
+    ['Feel', 'Report', 'Get Help', 'Updates', 'My Reports'],
+  );
+  assert.deepEqual(
+    nav.map((t) => TAB_LABELS[t].title),
+    ['Tell Us How You Feel', 'Report an Incident', 'Get Help', 'Things You Need to Know Now', 'My Reports'],
   );
 });
 
 test('each community tab follows the position features', () => {
   const onlyHelp = navFor(effectiveFeatures('community', ['report.help', 'alerts.view']), true);
-  assert.deepEqual(onlyHelp.primary, ['help', 'know']);
+  assert.deepEqual(onlyHelp, ['help', 'know', 'mine']);
   const none = navFor(effectiveFeatures('community', []), true);
-  assert.deepEqual(none.primary, []);
-  assert.deepEqual(none.more, []);
+  assert.deepEqual(none, []);
 });
 
 test('School Admins and System Admins keep their own layout, not the community tabs', () => {
   const sa = navFor(effectiveFeatures('school_admin', null));
-  assert.deepEqual(sa.primary, ['map', 'analytics']);
-  assert.ok(sa.more.includes('report'));
-  assert.ok(![...sa.primary, ...sa.more].some((t) => ['feel', 'incident', 'help', 'know', 'mine'].includes(t)));
+  assert.deepEqual(sa, ['map', 'analytics', 'queue', 'alerts', 'report', 'people']);
+  assert.ok(!sa.some((t) => ['feel', 'incident', 'help', 'know', 'mine'].includes(t)));
 });
 
 test('the incident buttons are exactly the ten requested, and Severe Weather is gone', () => {

@@ -9,10 +9,8 @@ import { PlacePicker } from './PlacePicker';
 export function DefaultLocationCard({ profile, locations, onChanged }: { profile: Profile; locations: Location[]; onChanged: () => Promise<void> }) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState('');
-  const [saved, setSaved] = useState(false);
   const current = profile.primary_location_id;
   const usable = current ? locations.some((l) => l.id === current) : false;
-  const needsReplacement = !usable;
 
   async function save(id: string) {
     setError('');
@@ -23,35 +21,25 @@ export function DefaultLocationCard({ profile, locations, onChanged }: { profile
     }
     await onChanged();
     setEditing(false);
-    setSaved(true);
   }
 
   return (
-    <div className="default-location">
-      <h3 className="section-title">My default location</h3>
-      {needsReplacement && !editing && (
-        <p className="notice" role="alert">
-          {current ? 'Your saved default location is no longer available.' : 'You have not saved a default location yet.'} Please choose one so reports can start from the right place.
-        </p>
-      )}
-      {!needsReplacement && !editing && (
-        <p className="place-summary">
-          📍 {placeLabel(current, locations)}
-          {saved && <small> · saved</small>}
-        </p>
-      )}
+    <section className="card default-location">
+      <div className="card-head">
+        <h3 className="section-title">My default place</h3>
+        {!editing && (
+          <button type="button" className="text-button" onClick={() => setEditing(true)}>
+            {usable ? 'Change' : 'Choose'}
+          </button>
+        )}
+      </div>
+      {!editing && <p className={usable ? 'place-summary' : 'notice'}>{usable ? `📍 ${placeLabel(current, locations)}` : 'Not set. Choose one so reports start from the right place.'}</p>}
       {error && (
         <p className="error-text" role="alert">
           {error}
         </p>
       )}
-      {editing ? (
-        <PlacePicker locations={locations} initial={usable ? current : null} actionLabel="Save as my default" skipLabel="Cancel" onPick={save} onSkip={() => setEditing(false)} />
-      ) : (
-        <button type="button" className="action-small" onClick={() => { setEditing(true); setSaved(false); }}>
-          {needsReplacement ? 'Choose a default location' : 'Change'}
-        </button>
-      )}
-    </div>
+      {editing && <PlacePicker locations={locations} initial={usable ? current : null} actionLabel="Save" skipLabel="Cancel" onPick={save} onSkip={() => setEditing(false)} />}
+    </section>
   );
 }

@@ -145,7 +145,7 @@ export function LayoutEditor({ locations, onPatch }: { locations: SetupLocation[
   const campusId = path[0]?.id ?? roots[0]?.id ?? null;
 
   const viewToggle = (
-    <div className="filter-row view-toggle" role="group" aria-label="Map view">
+    <div className="segmented view-toggle" role="group" aria-label="Map view">
       <button type="button" className={`filter-button${view === 'edit' ? ' is-active' : ''}`} aria-pressed={view === 'edit'} onClick={() => setView('edit')}>
         Edit one level
       </button>

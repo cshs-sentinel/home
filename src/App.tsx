@@ -3,18 +3,14 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { roleDetails, TAB_LABELS, type Role, type Tab } from './roles';
 import demoAccountList from './demo-accounts.json';
-
-// The list is empty once every demo login has been retired; the login card then hides the demo button.
-const demoAccounts = demoAccountList as { password: string; accounts: { role: string; email: string; displayName: string }[] };
 import { THEME_LABELS, useTheme } from './theme';
 import { SignUpCard } from './components/SignUpCard';
 import type { Profile, UserType } from './lib/types';
 import { USER_TYPE_COLUMNS, useExternalData, useRealtimeReload, useSchoolData, type SchoolData } from './lib/data';
 import { incidentSummary, since, type AlertTemplate } from './lib/analytics';
-import { ReportPanel } from './components/ReportPanel';
-import { AnalyticsPanel, type Range } from './components/AnalyticsPanel';
+import { ReportHub } from './components/ReportHub';
+import { AnalyticsPanel, RangeFilter, type Range } from './components/AnalyticsPanel';
 import { MapPanel } from './components/MapPanel';
-import { MoreMenu } from './components/MoreMenu';
 import { QueuePanel } from './components/QueuePanel';
 import { AlertsPanel } from './components/AlertsPanel';
 import { PeoplePanel } from './components/PeoplePanel';
@@ -25,6 +21,9 @@ import { KnowPanel } from './components/KnowPanel';
 import { MyReportsPanel } from './components/MyReportsPanel';
 import { SetupPanel } from './components/SetupPanel';
 import { effectiveFeatures, navFor } from './lib/features';
+
+// The list is empty once every demo login has been retired; the login card then hides the demo button.
+const demoAccounts = demoAccountList as { password: string; accounts: { role: string; email: string; displayName: string }[] };
 
 function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
@@ -128,7 +127,7 @@ function LoginCard({ onSignUp }: { onSignUp: () => void }) {
           <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
         {error && <p className="error-text">{error}</p>}
-        <button type="submit" disabled={submitting}>
+        <button type="submit" className="primary" disabled={submitting}>
           {submitting ? 'Signing in…' : 'Login'}
         </button>
       </form>
@@ -136,9 +135,9 @@ function LoginCard({ onSignUp }: { onSignUp: () => void }) {
         New here? Create a community account
       </button>
       {demoAccounts.accounts.length > 0 && (
-      <button type="button" className="link-button" onClick={() => setShowDemo((v) => !v)}>
-        {showDemo ? 'Hide demo accounts' : 'Try a demo account for each role'}
-      </button>
+        <button type="button" className="link-button" onClick={() => setShowDemo((v) => !v)}>
+          {showDemo ? 'Hide demo accounts' : 'Try a demo account for each role'}
+        </button>
       )}
       {showDemo && (
         <ul className="demo-accounts">
@@ -148,7 +147,7 @@ function LoginCard({ onSignUp }: { onSignUp: () => void }) {
                 {account.displayName}
                 <small> · {roleDetails[account.role as Role].label}</small>
               </span>
-              <button type="button" onClick={() => login(account.email, demoAccounts.password)} disabled={submitting}>
+              <button type="button" className="secondary" onClick={() => login(account.email, demoAccounts.password)} disabled={submitting}>
                 Log in
               </button>
             </li>
@@ -165,37 +164,32 @@ function LoginCard({ onSignUp }: { onSignUp: () => void }) {
 function PendingApprovalCard({ status }: { status: 'pending' | 'rejected' }) {
   return (
     <article className="login-card">
-      <p className="eyebrow">{status === 'pending' ? 'AWAITING APPROVAL' : 'REGISTRATION DECLINED'}</p>
-      <h3>{status === 'pending' ? 'Your registration is awaiting approval' : 'Your registration was not approved'}</h3>
-      <p className="lede">
+      <h3>{status === 'pending' ? 'Waiting for approval' : 'Not approved'}</h3>
+      <p className="auth-sub">
         {status === 'pending'
-          ? 'A School Admin or System Admin needs to approve your account before you can sign in to SENTINEL. Check back soon.'
-          : 'Contact your School Admin or System Admin if you think this is a mistake.'}
+          ? 'A School Admin will approve your account soon. Check back later.'
+          : 'Contact your School Admin if you think this is a mistake.'}
       </p>
-      <button type="button" className="secondary" onClick={() => supabase.auth.signOut()}>
+      <button type="button" className="secondary wide" onClick={() => supabase.auth.signOut()}>
         Sign out
       </button>
     </article>
   );
 }
 
-function Workspace({ profile, schoolName, email, userType, onProfileChanged }: { profile: Profile; schoolName: string | null; email: string; userType: UserType | null; onProfileChanged: () => Promise<void> }) {
+function Workspace({ profile, schoolName, email, userType, onProfileChanged, themeButton }: { profile: Profile; schoolName: string | null; email: string; userType: UserType | null; onProfileChanged: () => Promise<void>; themeButton: ReactNode }) {
   const details = roleDetails[profile.role];
   const features = useMemo(() => effectiveFeatures(profile.role, userType?.features ?? null), [profile.role, userType]);
   // Community Members (and Classroom Advisers, who are Community Members) get the
-  // four big-button tabs; School Admins and System Admins keep their own layout.
+  // big-button tabs; School Admins and System Admins keep their own layout.
   const simplified = profile.role === 'community';
-  const nav = navFor(features, simplified);
   // A Classroom Adviser (or any Community Member position with
-  // can_approve_own_location) gets the People tab too, scoped to just their
-  // own location's pending approvals -- otherwise community accounts never
-  // see People at all.
+  // can_approve_own_location) also gets People, scoped to just their own
+  // location's pending approvals -- otherwise community accounts never see People.
   const isLocationApprover = profile.role === 'community' && userType?.can_approve_own_location === true;
-  if (isLocationApprover && !nav.primary.includes('people') && !nav.more.includes('people')) {
-    nav.more = [...nav.more, 'people'];
-  }
-  const tabs = [...nav.primary, ...nav.more];
-  const [tab, setTab] = useState<Tab>(nav.primary[0] ?? 'report');
+  const baseTabs = navFor(features, simplified);
+  const tabs: Tab[] = isLocationApprover && !baseTabs.includes('people') ? [...baseTabs, 'people'] : baseTabs;
+  const [tab, setTab] = useState<Tab>(tabs[0] ?? 'report');
   const [days, setDays] = useState<Range>(14);
   const [template, setTemplate] = useState<AlertTemplate | null>(null);
   const { data, loading, error, reload } = useSchoolData(profile);
@@ -216,92 +210,108 @@ function Workspace({ profile, schoolName, email, userType, onProfileChanged }: {
   const external = useExternalData();
   const latestAlert = data.alerts.find((a) => a.status === 'published' && a.severity !== 'info');
   const queueUrgent = useMemo(() => urgentCount(profile.role, data), [profile.role, data]);
+  const showRange = tab === 'map' || tab === 'analytics';
 
   function draftFromInsight(t: AlertTemplate) {
     setTemplate(t);
-    setTab('alerts');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    go('alerts');
   }
 
   return (
-    <div className="workspace">
-      <div className="greeting">
-        <span className="role-symbol" aria-hidden="true">{details.icon}</span>
-        <div>
-          <p className="eyebrow">{(userType?.name ?? details.label).toUpperCase()}</p>
-          <h1>Hi, {profile.display_name ?? email}</h1>
-          <p className="lede">
-            {userType?.description || details.summary}
-            {schoolName ? ` · ${schoolName}` : ''}
-          </p>
-        </div>
-      </div>
-
-      {latestAlert && tabs.includes(alertsTab) && (
-        <button type="button" className={`alert-banner sev-${latestAlert.severity}`} onClick={() => setTab(alertsTab)}>
-          <span aria-hidden="true">{latestAlert.severity === 'urgent' ? '🚨' : '⚠️'}</span>
-          <span>
-            <strong>{latestAlert.title}</strong>
-            <small>Tap to read</small>
+    <div className="app-shell">
+      <aside className="app-sidebar">
+        <a className="app-brand" href="#top" aria-label="SENTINEL home">
+          <SentinelLogo className="brand-logo" />
+          <span>SENTINEL</span>
+        </a>
+        {tabs.length > 1 && (
+          <nav className="side-nav" aria-label="Sections">
+            {tabs.map((t) => (
+              <button type="button" key={t} className={`side-link${tab === t ? ' is-active' : ''}`} aria-current={tab === t ? 'page' : undefined} onClick={() => setTab(t)}>
+                <span className="side-icon" aria-hidden="true">{TAB_LABELS[t].icon}</span>
+                <span className="side-label">{TAB_LABELS[t].label}</span>
+                {t === 'queue' && queueUrgent > 0 && <span className="badge">{queueUrgent}</span>}
+              </button>
+            ))}
+          </nav>
+        )}
+        <div className="side-user">
+          <span className="side-avatar" aria-hidden="true">{details.icon}</span>
+          <span className="side-user-text">
+            <strong>{profile.display_name ?? email}</strong>
+            <small>{userType?.name ?? details.label}</small>
           </span>
-        </button>
-      )}
+        </div>
+      </aside>
 
-      {tabs.length === 0 && <p className="empty-note">Your account has no features turned on yet. Ask your System Admin to set up your position.</p>}
-
-      {tabs.length > 1 && (
-        <nav className="tab-bar" aria-label="Sections">
-          {nav.primary.map((t) => (
-            <button type="button" key={t} className={`tab-button${tab === t ? ' is-active' : ''}`} aria-current={tab === t ? 'page' : undefined} onClick={() => setTab(t)}>
-              <span aria-hidden="true">{TAB_LABELS[t].icon}</span>
-              <span>{TAB_LABELS[t].label}</span>
-              {t === 'queue' && queueUrgent > 0 && <span className="badge">{queueUrgent}</span>}
+      <div className="app-main">
+        <header className="app-topbar">
+          <div className="app-heading">
+            <h1 className="app-title">{TAB_LABELS[tab].title}</h1>
+            {schoolName && <p className="app-sub">{schoolName}</p>}
+          </div>
+          <div className="app-topbar-actions">
+            {showRange && <RangeFilter days={days} onDays={setDays} />}
+            {tabs.includes('queue') && (
+              <button type="button" className="icon-button" aria-label={`Queue: ${queueUrgent} need attention`} onClick={() => setTab('queue')}>
+                <span aria-hidden="true">🔔</span>
+                {queueUrgent > 0 && <span className="badge">{queueUrgent}</span>}
+              </button>
+            )}
+            {themeButton}
+            <button type="button" className="secondary" onClick={() => supabase.auth.signOut()}>
+              Sign out
             </button>
-          ))}
-          {nav.more.length > 0 && <MoreMenu items={nav.more} active={tab} badges={{ queue: queueUrgent }} onSelect={setTab} />}
-        </nav>
-      )}
+          </div>
+        </header>
 
-      {error && <p className="error-text">Some data could not load: {error}</p>}
-      <div className={`panel${loading ? ' is-loading' : ''}`}>
-        {tab === 'feel' && tabs.includes('feel') && <FeelPanel profile={profile} locations={data.locations} onSent={refresh} onGo={go} />}
-        {tab === 'incident' && tabs.includes('incident') && (
-          <QuickReport kind="incident" profile={profile} locations={data.locations} preset={preset?.tab === 'incident' ? preset.value : null} onPresetUsed={clearPreset} showSafe={false} onSent={refresh} onSeeReports={() => go('mine')} />
-        )}
-        {tab === 'help' && tabs.includes('help') && (
-          <QuickReport kind="help" profile={profile} locations={data.locations} preset={preset?.tab === 'help' ? preset.value : null} onPresetUsed={clearPreset} showSafe={features.has('report.safe')} onSent={refresh} onSeeReports={() => go('mine')} />
-        )}
-        {tab === 'know' && tabs.includes('know') && <KnowPanel profile={profile} features={features} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} onChanged={reload} />}
-        {tab === 'mine' && tabs.includes('mine') && <MyReportsPanel profile={profile} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onChanged={refresh} onProfileChanged={onProfileChanged} />}
-        {tab === 'report' && tabs.includes('report') && <ReportPanel profile={profile} features={features} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onSent={reload} onProfileChanged={onProfileChanged} />}
-        {tab === 'map' && tabs.includes('map') && <MapPanel role={profile.role} days={days} onDays={setDays} data={data} />}
-        {tab === 'analytics' && tabs.includes('analytics') && (
-          <AnalyticsPanel role={profile.role} days={days} onDays={setDays} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} onDraftAlert={draftFromInsight} />
-        )}
-        {tab === 'queue' && tabs.includes('queue') && <QueuePanel data={data} onChanged={reload} />}
-        {tab === 'alerts' && tabs.includes('alerts') && (
-          <AlertsPanel profile={profile} features={features} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} initialTemplate={template} onChanged={reload} />
-        )}
-        {tab === 'people' && tabs.includes('people') && (isLocationApprover ? <MyLocationApprovals /> : <PeoplePanel profile={profile} data={data} onChanged={reload} />)}
-        {tab === 'setup' && tabs.includes('setup') && <SetupPanel profile={profile} features={features} people={data.people} onPeopleChanged={reload} />}
+        <div className="workspace">
+          {latestAlert && tabs.includes(alertsTab) && tab !== alertsTab && (
+            <button type="button" className={`alert-banner sev-${latestAlert.severity}`} onClick={() => setTab(alertsTab)}>
+              <span aria-hidden="true">{latestAlert.severity === 'urgent' ? '🚨' : '⚠️'}</span>
+              <strong>{latestAlert.title}</strong>
+            </button>
+          )}
+
+          {tabs.length === 0 && <p className="empty-note">Your account has no features turned on yet. Ask your System Admin to set up your position.</p>}
+
+          {error && <p className="error-text">Some data could not load: {error}</p>}
+          <div className={`panel${loading ? ' is-loading' : ''}`}>
+            {tab === 'feel' && tabs.includes('feel') && <FeelPanel profile={profile} locations={data.locations} onSent={refresh} onGo={go} />}
+            {tab === 'incident' && tabs.includes('incident') && (
+              <QuickReport kind="incident" profile={profile} locations={data.locations} preset={preset?.tab === 'incident' ? preset.value : null} onPresetUsed={clearPreset} showSafe={false} onSent={refresh} onSeeReports={() => go('mine')} />
+            )}
+            {tab === 'help' && tabs.includes('help') && (
+              <QuickReport kind="help" profile={profile} locations={data.locations} preset={preset?.tab === 'help' ? preset.value : null} onPresetUsed={clearPreset} showSafe={features.has('report.safe')} onSent={refresh} onSeeReports={() => go('mine')} />
+            )}
+            {tab === 'know' && tabs.includes('know') && <KnowPanel profile={profile} features={features} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} onChanged={reload} />}
+            {tab === 'mine' && tabs.includes('mine') && <MyReportsPanel profile={profile} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onChanged={refresh} onProfileChanged={onProfileChanged} />}
+            {tab === 'report' && tabs.includes('report') && <ReportHub profile={profile} features={features} locations={data.locations} onSent={refresh} />}
+            {tab === 'map' && tabs.includes('map') && <MapPanel role={profile.role} days={days} data={data} />}
+            {tab === 'analytics' && tabs.includes('analytics') && (
+              <AnalyticsPanel role={profile.role} days={days} data={data} weather={external.weather} quakes={external.quakes} onDraftAlert={draftFromInsight} />
+            )}
+            {tab === 'queue' && tabs.includes('queue') && <QueuePanel data={data} onChanged={reload} />}
+            {tab === 'alerts' && tabs.includes('alerts') && <AlertsPanel profile={profile} features={features} data={data} initialTemplate={template} onChanged={reload} />}
+            {tab === 'people' && tabs.includes('people') && (isLocationApprover ? <MyLocationApprovals /> : <PeoplePanel profile={profile} data={data} onChanged={reload} />)}
+            {tab === 'setup' && tabs.includes('setup') && <SetupPanel profile={profile} features={features} people={data.people} onPeopleChanged={reload} />}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-// Items behind the More menu that should not wait: help requests and
-// unacknowledged incidents for School Admins.
+// Things on the Queue that should not wait: help requests and reports no
+// responder has looked at yet. Only School Admins have a Queue.
 function urgentCount(role: Role, data: SchoolData): number {
-  if (role === 'school_admin') {
-    const help = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help' && c.triage_status !== 'resolved').length;
-    return help + incidentSummary(data.incidents).unacknowledged;
-  }
-  return 0;
+  if (role !== 'school_admin') return 0;
+  const help = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help' && c.triage_status !== 'resolved').length;
+  return help + incidentSummary(data.incidents).unacknowledged;
 }
 
-// Signed-out landing page: a brand panel (logo, name, tagline) beside the sign-in form.
-// The logo is drawn as SVG so it stays sharp at any size.
-function SentinelLogo({ className = "auth-logo" }: { className?: string }) {
+// The SENTINEL shield, drawn as SVG so it stays sharp at any size.
+function SentinelLogo({ className = 'auth-logo' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 64 72" aria-hidden="true">
       <defs>
@@ -317,7 +327,9 @@ function SentinelLogo({ className = "auth-logo" }: { className?: string }) {
   );
 }
 
-function SignedOutScreen({ themeButton }: { themeButton: ReactNode }) {
+// The brand panel beside a white card. Used for signing in, waiting for
+// approval, and loading, so there is one signed-out look.
+function AuthLayout({ themeButton, children }: { themeButton: ReactNode; children: ReactNode }) {
   return (
     <main className="auth-shell">
       <aside className="auth-brand">
@@ -330,10 +342,8 @@ function SignedOutScreen({ themeButton }: { themeButton: ReactNode }) {
         <p className="auth-motto">Safe and Motivating Learning Environment.</p>
       </aside>
       <section className="auth-panel">
-        {themeButton}
-        <div className="auth-panel-inner">
-          <AuthCards />
-        </div>
+        <div className="auth-theme">{themeButton}</div>
+        <div className="auth-panel-inner">{children}</div>
       </section>
     </main>
   );
@@ -343,44 +353,28 @@ export function App() {
   const { session, profile, schoolName, userType, status, refreshProfile } = useAuth();
   const { theme, cycleTheme } = useTheme();
   const themeButton = (
-    <button type="button" className="theme-toggle auth-theme" onClick={cycleTheme} aria-label={`Theme: ${THEME_LABELS[theme]}. Switch theme`}>
-      <span aria-hidden="true">◐</span> {THEME_LABELS[theme]}
+    <button type="button" className="secondary theme-toggle" onClick={cycleTheme} aria-label={`Theme: ${THEME_LABELS[theme]}. Switch theme`}>
+      <span aria-hidden="true">◐</span> <span className="theme-label">{THEME_LABELS[theme]}</span>
     </button>
   );
-  if (status === 'ready' && !session) return <SignedOutScreen themeButton={themeButton} />;
+
+  if (status === 'ready' && session && profile && (!profile.status || profile.status === 'approved')) {
+    return <Workspace key={profile.id + (userType?.id ?? '')} profile={profile} userType={userType} schoolName={schoolName} email={session.user.email ?? ''} onProfileChanged={refreshProfile} themeButton={themeButton} />;
+  }
 
   return (
-    <main className={session ? 'signed-in' : undefined}>
-      <header>
-        <a className="brand" href="#top">
-          <SentinelLogo className="brand-logo" /> SENTINEL
-        </a>
-        <div className="header-actions">
-          <button type="button" className="theme-toggle" onClick={cycleTheme} aria-label={`Theme: ${THEME_LABELS[theme]}. Switch theme`}>
-            <span aria-hidden="true">◐</span> {THEME_LABELS[theme]}
+    <AuthLayout themeButton={themeButton}>
+      {status === 'loading' && <p className="auth-sub">Loading…</p>}
+      {status === 'ready' && !session && <AuthCards />}
+      {status === 'ready' && session && profile && profile.status && profile.status !== 'approved' && <PendingApprovalCard status={profile.status} />}
+      {status === 'ready' && session && !profile && (
+        <article className="login-card">
+          <p className="error-text">Signed in, but no profile was found for this account.</p>
+          <button type="button" className="secondary wide" onClick={() => supabase.auth.signOut()}>
+            Sign out
           </button>
-          {session && (
-            <button className="secondary" onClick={() => supabase.auth.signOut()}>
-              Sign out
-            </button>
-          )}
-        </div>
-      </header>
-      {!session && (
-        <section className="hero" id="top">
-          <h1>Every voice can help build a safer school.</h1>
-          <p className="lede">SENTINEL turns feelings, reports, and weather into early warnings your school can act on.</p>
-        </section>
+        </article>
       )}
-      <section className="access">
-        {status === 'loading' && <p>Loading…</p>}
-        {status === 'ready' && !session && <AuthCards />}
-        {status === 'ready' && session && profile && profile.status && profile.status !== 'approved' && <PendingApprovalCard status={profile.status} />}
-        {status === 'ready' && session && profile && (!profile.status || profile.status === 'approved') && (
-          <Workspace key={profile.id + (userType?.id ?? '')} profile={profile} userType={userType} schoolName={schoolName} email={session.user.email ?? ''} onProfileChanged={refreshProfile} />
-        )}
-        {status === 'ready' && session && !profile && <p className="error-text">Signed in, but no profile was found for this account.</p>}
-      </section>
-    </main>
+    </AuthLayout>
   );
 }

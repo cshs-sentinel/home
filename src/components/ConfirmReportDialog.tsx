@@ -3,6 +3,8 @@ import type { Option } from '../lib/catalog';
 import { placeLabel } from '../lib/layout';
 import type { Location } from '../lib/types';
 
+export type NoteMode = 'none' | 'optional' | 'required';
+
 // Opens when a category button is tapped. It shows the category, starts from the
 // person's saved default location, lets them pick the place it is really at from
 // the school's configured places, and only sends when they press Confirm.
@@ -12,22 +14,20 @@ import type { Location } from '../lib/types';
 // choices are exactly the places a System Admin configured. The database checks
 // the same rules again when the report is saved.
 export function ConfirmReportDialog({
-  heading,
   option,
   locations,
   defaultLocationId,
   confirmLabel,
-  allowNote = true,
+  note: noteMode = 'optional',
   onConfirm,
   onCancel,
 }: {
-  heading: string;
   option: Option;
   locations: Location[];
   defaultLocationId: string | null;
   confirmLabel: string;
-  // Help requests have nowhere to store a note, so they do not offer one.
-  allowNote?: boolean;
+  // Help requests have nowhere to store a note; a suggestion is nothing but the note.
+  note?: NoteMode;
   onConfirm: (locationId: string, note: string) => Promise<string | null>;
   onCancel: () => void;
 }) {
@@ -37,6 +37,7 @@ export function ConfirmReportDialog({
   const [note, setNote] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const noteMissing = noteMode === 'required' && note.trim().length < 3;
 
   // Every active place with its full path, in reading order.
   const choices = useMemo(
@@ -53,7 +54,7 @@ export function ConfirmReportDialog({
   }, []);
 
   async function confirm() {
-    if (!locationId || sending) return;
+    if (!locationId || noteMissing || sending) return;
     setSending(true);
     setError('');
     const problem = await onConfirm(locationId, note.trim());
@@ -63,6 +64,15 @@ export function ConfirmReportDialog({
       setSending(false);
     }
   }
+
+  // Only explain the place when it is not simply the person's default.
+  const hint = defaultUsable && locationId === defaultLocationId ? null : defaultLocationId && !defaultUsable ? 'Your default place is no longer available. Choose where this is.' : null;
+  const noteField = (
+    <label className="field">
+      <span className={noteMode === 'required' ? undefined : 'sr-only'}>{noteMode === 'required' ? 'Your suggestion' : 'Detail'}</span>
+      <textarea rows={3} maxLength={noteMode === 'required' ? 1000 : 300} required={noteMode === 'required'} value={note} onChange={(e) => setNote(e.target.value)} />
+    </label>
+  );
 
   return (
     <dialog
@@ -84,14 +94,15 @@ export function ConfirmReportDialog({
           void confirm();
         }}
       >
-        <p className="eyebrow">{heading}</p>
         <h2 id="confirm-title" className="confirm-category">
           <span aria-hidden="true">{option.icon}</span> {option.label}
         </h2>
 
+        {noteMode === 'required' && noteField}
+
         <label className="field">
-          <span>Where is this?</span>
-          <select className="role-select" value={locationId} onChange={(e) => setLocationId(e.target.value)} required aria-describedby="confirm-where">
+          <span>Where?</span>
+          <select className="role-select" value={locationId} onChange={(e) => setLocationId(e.target.value)} required>
             {!locationId && <option value="">Choose a place</option>}
             {choices.map((c) => (
               <option key={c.id} value={c.id}>
@@ -100,24 +111,13 @@ export function ConfirmReportDialog({
             ))}
           </select>
         </label>
-        <p id="confirm-where" className="fine-print">
-          {defaultUsable && locationId === defaultLocationId
-            ? '📍 This is your default location. Choose a different place if it is happening somewhere else.'
-            : defaultUsable
-              ? '📍 Your default location is not selected. That is fine if this is happening elsewhere.'
-              : defaultLocationId
-                ? 'Your default location is no longer available. Choose where this is.'
-                : 'You have not saved a default location yet. Choose where this is.'}
-        </p>
+        {hint && <p className="fine-print">{hint}</p>}
 
-        {allowNote && (
-        <details className="confirm-more">
-          <summary>Add a detail (optional)</summary>
-          <label className="field">
-            <span className="sr-only">Detail</span>
-            <textarea rows={2} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything that helps responders. You can skip this." />
-          </label>
-        </details>
+        {noteMode === 'optional' && (
+          <details className="confirm-more">
+            <summary>Add a detail (optional)</summary>
+            {noteField}
+          </details>
         )}
 
         {error && (
@@ -126,7 +126,7 @@ export function ConfirmReportDialog({
           </p>
         )}
         <div className="confirm-actions">
-          <button type="submit" className="big-button primary" disabled={!locationId || sending}>
+          <button type="submit" className="big-button primary" disabled={!locationId || noteMissing || sending}>
             {sending ? 'Sending…' : confirmLabel}
           </button>
           <button type="button" className="big-button ghost" disabled={sending} onClick={onCancel}>

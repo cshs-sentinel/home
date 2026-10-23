@@ -12,19 +12,21 @@ export type Tab = 'report' | 'feel' | 'incident' | 'help' | 'know' | 'mine' | 'm
 
 export const ROLE_ORDER: Role[] = ['community', 'school_admin', 'system_admin'];
 
-export const TAB_LABELS: Record<Tab, { label: string; icon: string }> = {
-  report: { label: 'Report', icon: '✚' },
-  feel: { label: 'Tell Us How You Feel', icon: '💬' },
-  incident: { label: 'Report an Incident', icon: '🚨' },
-  help: { label: 'Get Help', icon: '🆘' },
-  know: { label: 'Things You Need to Know Now', icon: 'ℹ️' },
-  mine: { label: 'My Reports', icon: '📋' },
-  map: { label: 'Map', icon: '🗺' },
-  analytics: { label: 'Analytics', icon: '◔' },
-  queue: { label: 'Queue', icon: '☰' },
-  alerts: { label: 'Alerts', icon: '📣' },
-  people: { label: 'People', icon: '👥' },
-  setup: { label: 'Setup', icon: '⚙' },
+// `label` is short enough for the sidebar and the phone tab bar; `title` is the
+// heading shown at the top of the page.
+export const TAB_LABELS: Record<Tab, { label: string; title: string; icon: string }> = {
+  report: { label: 'Report', title: 'Report', icon: '✚' },
+  feel: { label: 'Feel', title: 'Tell Us How You Feel', icon: '💬' },
+  incident: { label: 'Report', title: 'Report an Incident', icon: '🚨' },
+  help: { label: 'Get Help', title: 'Get Help', icon: '🆘' },
+  know: { label: 'Updates', title: 'Things You Need to Know Now', icon: 'ℹ️' },
+  mine: { label: 'My Reports', title: 'My Reports', icon: '📋' },
+  map: { label: 'Map', title: 'Map', icon: '🗺' },
+  analytics: { label: 'Analytics', title: 'Analytics', icon: '◔' },
+  queue: { label: 'Queue', title: 'Queue', icon: '☰' },
+  alerts: { label: 'Alerts', title: 'Alerts', icon: '📣' },
+  people: { label: 'People', title: 'People', icon: '👥' },
+  setup: { label: 'Setup', title: 'Setup', icon: '⚙' },
 };
 
 export const roleDetails: Record<Role, { label: string; icon: string; summary: string }> = {

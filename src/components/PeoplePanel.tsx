@@ -3,12 +3,15 @@ import { addPerson, approveRegistration, rejectRegistration, setUserType, type S
 import { placeLabel } from '../lib/layout';
 import type { Location, Profile, UserType } from '../lib/types';
 import { roleDetails } from '../roles';
+import { PendingList } from './PendingList';
 import { PlacePicker } from './PlacePicker';
 import { timeAgo } from './QueuePanel';
 
 export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; data: SchoolData; onChanged: () => Promise<void> }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState<Added | null>(null);
   const isSystemAdmin = profile.role === 'system_admin';
   const typeById = new Map(data.userTypes.map((t) => [t.id, t]));
   // A School Admin may only assign Community Member positions. Only a
@@ -41,52 +44,63 @@ export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; da
   // System Admin approves them; admin-added people skip this entirely.
   const pending = active.filter((p) => p.status === 'pending');
   const people = active.filter((p) => p.status !== 'pending');
-  const counts = data.userTypes
-    .map((t) => ({ type: t, n: people.filter((p) => p.user_type_id === t.id).length }))
-    .filter((c) => c.n > 0);
 
   return (
     <div className="people">
-      <AddPersonForm assignable={assignable} isSystemAdmin={isSystemAdmin} locations={data.locations} onAdded={onChanged} />
-
       {pending.length > 0 && (
-        <section>
-          <h2 className="section-title">Waiting for approval</h2>
-          <p className="fine-print">New community sign-ups need a School Admin or System Admin to approve them before they can sign in.</p>
-          <ul className="queue-list">
-            {pending.map((p) => {
-              const type = p.user_type_id ? typeById.get(p.user_type_id) : undefined;
-              return (
-                <li key={p.id} className="queue-item">
-                  <span className="queue-icon" aria-hidden="true">{roleDetails[p.role].icon}</span>
-                  <div className="queue-main">
-                    <strong>{p.display_name ?? 'Unnamed account'}</strong>
-                    <small>{type?.name ?? 'No position'} · {roleDetails[p.role].label}</small>
-                  </div>
-                  <div className="queue-actions">
-                    <button type="button" className="action-small primary" disabled={busy === p.id} onClick={() => decide(p, true)}>
-                      Approve
-                    </button>
-                    <button type="button" className="action-small" disabled={busy === p.id} onClick={() => decide(p, false)}>
-                      Decline
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+        <section className="card">
+          <h2 className="section-title">
+            Waiting for approval <span className="count">{pending.length}</span>
+          </h2>
+          <PendingList
+            people={pending.map((p) => ({ id: p.id, name: p.display_name, detail: `${(p.user_type_id && typeById.get(p.user_type_id)?.name) || 'No position'} · ${roleDetails[p.role].label}` }))}
+            busy={busy}
+            onDecide={(id, approve) => {
+              const person = pending.find((p) => p.id === id);
+              if (person) decide(person, approve);
+            }}
+          />
         </section>
       )}
 
-      <section>
-        <h2 className="section-title">People in your school</h2>
-        <div className="chip-row">
-          {counts.map((c) => (
-            <span key={c.type.id} className="chip">
-              {c.type.name}: {c.n}
-            </span>
-          ))}
+      <section className="card">
+        <div className="card-head">
+          <h2 className="section-title">
+            People <span className="count">{people.length}</span>
+          </h2>
+          {!adding && (
+            <button type="button" className="action-small primary" onClick={() => setAdding(true)}>
+              + Add person
+            </button>
+          )}
         </div>
+        {adding && (
+          <AddPersonForm
+            assignable={assignable}
+            isSystemAdmin={isSystemAdmin}
+            locations={data.locations}
+            onClose={() => setAdding(false)}
+            onAdded={async (r) => {
+              setAdded(r);
+              setAdding(false);
+              await onChanged();
+            }}
+          />
+        )}
+        {added && (
+          <p className="notice">
+            {added.email} is ready.{' '}
+            {added.setupLink ? (
+              <>
+                Share this one-time link so they can set a password:
+                <br />
+                <code>{added.setupLink}</code>
+              </>
+            ) : (
+              'Ask them to use "Forgot password" on the sign-in page to set one.'
+            )}
+          </p>
+        )}
         {message && <p className="notice">{message}</p>}
         <ul className="queue-list">
           {people.map((p) => {
@@ -127,8 +141,8 @@ export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; da
           })}
         </ul>
       </section>
-      <section>
-        <h2 className="section-title">Recent activity log</h2>
+      <details className="card disclosure">
+        <summary>Activity log</summary>
         {data.audit.length === 0 ? (
           <p className="empty-note">No logged activity.</p>
         ) : (
@@ -143,16 +157,17 @@ export function PeoplePanel({ profile, data, onChanged }: { profile: Profile; da
             ))}
           </ul>
         )}
-      </section>
+      </details>
     </div>
   );
 }
 
+type Added = { email: string; setupLink: string | null };
+
 // Creates an account directly, outside public sign-up — the only way a
 // School Admin or System Admin gets created. A School Admin's position
 // choices here are limited to Community Member positions by `assignable`.
-function AddPersonForm({ assignable, isSystemAdmin, locations, onAdded }: { assignable: UserType[]; isSystemAdmin: boolean; locations: Location[]; onAdded: () => Promise<void> }) {
-  const [open, setOpen] = useState(false);
+function AddPersonForm({ assignable, isSystemAdmin, locations, onAdded, onClose }: { assignable: UserType[]; isSystemAdmin: boolean; locations: Location[]; onAdded: (r: Added) => Promise<void>; onClose: () => void }) {
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [designationId, setDesignationId] = useState('');
@@ -160,7 +175,6 @@ function AddPersonForm({ assignable, isSystemAdmin, locations, onAdded }: { assi
   const [pickingPlace, setPickingPlace] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<{ email: string; setupLink: string | null } | null>(null);
 
   async function submit() {
     if (!designationId) {
@@ -169,36 +183,20 @@ function AddPersonForm({ assignable, isSystemAdmin, locations, onAdded }: { assi
     }
     setSubmitting(true);
     setError('');
-    setResult(null);
     const r = await addPerson({ email, displayName, designationId, locationId });
     setSubmitting(false);
     if (r.error) {
       setError(r.error);
       return;
     }
-    setResult({ email: r.email ?? email.trim(), setupLink: r.setupLink ?? null });
-    setEmail('');
-    setDisplayName('');
-    setDesignationId('');
-    setLocationId(null);
-    await onAdded();
+    await onAdded({ email: r.email ?? email.trim(), setupLink: r.setupLink ?? null });
   }
 
   return (
-    <section className="composer">
-      <h2 className="section-title">Add a person</h2>
-      {!open ? (
-        <button type="button" className="action-small primary" onClick={() => setOpen(true)}>
-          Add person
-        </button>
-      ) : (
-        <>
-          <p className="fine-print">
-            {isSystemAdmin
-              ? 'Create an account for any position, including School Admin and System Admin.'
-              : 'Create a Community Member account. Only a System Admin can add a School Admin or System Admin.'}
-          </p>
+    <div className="new-person">
+      {!isSystemAdmin && <p className="fine-print">Only a System Admin can add a School Admin or System Admin.</p>}
           <form
+            className="form-grid"
             onSubmit={(e) => {
               e.preventDefault();
               submit();
@@ -224,14 +222,14 @@ function AddPersonForm({ assignable, isSystemAdmin, locations, onAdded }: { assi
               </select>
             </label>
             <div className="field">
-              <span>Default location (optional)</span>
+              <span>Default place (optional)</span>
               {locationId && !pickingPlace ? (
                 <p className="place-summary">
                   📍 {placeLabel(locationId, locations)}{' '}
-                  <button type="button" className="action-small" onClick={() => setPickingPlace(true)}>
+                  <button type="button" className="text-button" onClick={() => setPickingPlace(true)}>
                     Change
                   </button>
-                  <button type="button" className="action-small" onClick={() => setLocationId(null)}>
+                  <button type="button" className="text-button" onClick={() => setLocationId(null)}>
                     Clear
                   </button>
                 </p>
@@ -258,35 +256,11 @@ function AddPersonForm({ assignable, isSystemAdmin, locations, onAdded }: { assi
               <button type="submit" className="action-small primary" disabled={submitting}>
                 {submitting ? 'Adding…' : 'Create account'}
               </button>
-              <button
-                type="button"
-                className="action-small"
-                onClick={() => {
-                  setOpen(false);
-                  setError('');
-                  setResult(null);
-                }}
-              >
+              <button type="button" className="action-small" onClick={onClose}>
                 Cancel
               </button>
             </div>
           </form>
-        </>
-      )}
-      {result && (
-        <p className="notice">
-          {result.email} is ready.{' '}
-          {result.setupLink ? (
-            <>
-              Share this one-time link so they can set a password:
-              <br />
-              <code>{result.setupLink}</code>
-            </>
-          ) : (
-            'Ask them to use "Forgot password" on the sign-in page to set one.'
-          )}
-        </p>
-      )}
-    </section>
+    </div>
   );
 }

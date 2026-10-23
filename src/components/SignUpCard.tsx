@@ -57,7 +57,6 @@ export function SignUpCard({ onLogin }: { onLogin: () => void }) {
   if (confirmEmail) {
     return (
       <article className="login-card">
-        <p className="eyebrow">CHECK YOUR EMAIL</p>
         <h3>Almost done</h3>
         <p>We sent a confirmation link to {email}. Open it, then log in.</p>
         <button type="button" className="link-button" onClick={onLogin}>
@@ -71,8 +70,8 @@ export function SignUpCard({ onLogin }: { onLogin: () => void }) {
 
   return (
     <article className="login-card">
-      <p className="eyebrow">CREATE AN ACCOUNT</p>
-      <h3>Join your school as a community member</h3>
+      <h3>Create an account</h3>
+      <p className="auth-sub">For students, staff, and visitors.</p>
       {!options && !loadError && <p>Loading…</p>}
       {loadError && <p className="error-text">{loadError}</p>}
       {closed && <p className="notice">Sign-up is closed right now. Ask your school's System Admin to create your account.</p>}
@@ -143,7 +142,7 @@ export function SignUpCard({ onLogin }: { onLogin: () => void }) {
                 onSkip={locationId ? () => setPickingPlace(false) : undefined}
               />
             )}
-            <small className="fine-print">Where you usually are, for example your homeroom or office. Reports start from here and you can change it later.</small>
+            <small className="fine-print">Where you usually are, like your classroom. You can change it later.</small>
           </div>
           {error && <p className="error-text">{error}</p>}
           <button type="submit" disabled={submitting || !locationId || !designationId || !gender}>

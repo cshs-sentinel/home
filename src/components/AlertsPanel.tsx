@@ -3,9 +3,7 @@ import { ALERT_TEMPLATES, type AlertTemplate } from '../lib/analytics';
 import { alertAction, draftAlert, type SchoolData } from '../lib/data';
 import type { Alert, Profile } from '../lib/types';
 import type { Feature } from '../lib/features';
-import type { Quake, WeatherSnapshot } from '../lib/weather';
 import { ROLE_ORDER, roleDetails, type Role } from '../roles';
-import { WeatherPanel } from './WeatherPanel';
 import { timeAgo } from './QueuePanel';
 
 const TEMPLATE_BUTTONS: { key: AlertTemplate; label: string; icon: string }[] = [
@@ -16,26 +14,36 @@ const TEMPLATE_BUTTONS: { key: AlertTemplate; label: string; icon: string }[] = 
   { key: 'wellbeing', label: 'Wellbeing', icon: '💚' },
 ];
 
-const SEVERITY_ICON: Record<Alert['severity'], string> = { info: 'ℹ️', advisory: '⚠️', urgent: '🚨' };
+const SEVERITY: Record<Alert['severity'], { icon: string; label: string }> = {
+  info: { icon: 'ℹ️', label: 'Info' },
+  advisory: { icon: '⚠️', label: 'Advisory' },
+  urgent: { icon: '🚨', label: 'Urgent' },
+};
+
+const PENDING_STATUS: Partial<Record<Alert['status'], string>> = { draft: 'Draft', approved: 'Approved, not published' };
 
 type Props = {
   profile: Profile;
   features: Set<Feature>;
   data: SchoolData;
-  weather: WeatherSnapshot | null;
-  quakes: Quake[];
-  weatherError: string;
   initialTemplate: AlertTemplate | null;
   onChanged: () => Promise<void>;
 };
 
-export function AlertsPanel({ profile, features, data, weather, quakes, weatherError, initialTemplate, onChanged }: Props) {
+// School alerts. Staff who can draft see drafts waiting for approval first and
+// open the composer only when they need it; everyone else just reads alerts.
+export function AlertsPanel({ profile, features, data, initialTemplate, onChanged }: Props) {
   const canDraft = features.has('alerts.draft');
   const isAdmin = features.has('alerts.approve');
   const published = data.alerts.filter((a) => a.status === 'published');
   const pending = data.alerts.filter((a) => a.status === 'draft' || a.status === 'approved');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [composing, setComposing] = useState(initialTemplate !== null);
+
+  useEffect(() => {
+    if (initialTemplate) setComposing(true);
+  }, [initialTemplate]);
 
   async function act(alert: Alert, action: 'approve_alert' | 'publish_alert' | 'cancel_alert') {
     setBusy(alert.id);
@@ -48,31 +56,75 @@ export function AlertsPanel({ profile, features, data, weather, quakes, weatherE
 
   return (
     <div className="alerts">
-      <WeatherPanel weather={weather} quakes={quakes} error={weatherError} compact />
+      {error && (
+        <p className="error-text" role="alert">
+          {error}
+        </p>
+      )}
 
-      <section>
+      {canDraft && pending.length > 0 && (
+        <section className="card">
+          <h2 className="section-title">Waiting for approval</h2>
+          <ul className="queue-list">
+            {pending.map((a) => (
+              <li key={a.id} className="queue-item">
+                <span className="queue-icon" aria-hidden="true">{SEVERITY[a.severity].icon}</span>
+                <div className="queue-main">
+                  <strong>{a.title}</strong>
+                  <small>
+                    {PENDING_STATUS[a.status]} · {audienceLabel(a)} · {timeAgo(a.created_at)}
+                  </small>
+                </div>
+                <div className="queue-actions">
+                  {isAdmin && a.status === 'draft' && (
+                    <button type="button" className="action-small primary" disabled={busy === a.id} onClick={() => act(a, 'approve_alert')}>
+                      Approve
+                    </button>
+                  )}
+                  {isAdmin && a.status === 'approved' && (
+                    <button type="button" className="action-small primary" disabled={busy === a.id} onClick={() => act(a, 'publish_alert')}>
+                      Publish
+                    </button>
+                  )}
+                  {(isAdmin || (a.status === 'draft' && a.created_by === profile.id)) && (
+                    <button type="button" className="text-button" disabled={busy === a.id} onClick={() => act(a, 'cancel_alert')}>
+                      Discard
+                    </button>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {canDraft &&
+        (composing ? (
+          <Composer profile={profile} initialTemplate={initialTemplate} onSaved={onChanged} onClose={() => setComposing(false)} />
+        ) : (
+          <button type="button" className="action-small primary new-alert" onClick={() => setComposing(true)}>
+            + New alert
+          </button>
+        ))}
+
+      <section className="card">
         <h2 className="section-title">School alerts</h2>
-        {error && (
-          <p className="error-text" role="alert">
-            {error}
-          </p>
-        )}
         {published.length === 0 ? (
           <p className="empty-note">No alerts right now.</p>
         ) : (
           <ul className="alert-list">
             {published.map((a) => (
               <li key={a.id} className={`alert-item sev-${a.severity}`}>
-                <span className="queue-icon" aria-hidden="true">{SEVERITY_ICON[a.severity]}</span>
+                <span className="queue-icon" aria-hidden="true">{SEVERITY[a.severity].icon}</span>
                 <div className="queue-main">
                   <strong>{a.title}</strong>
                   <p>{a.body}</p>
                   <small>
-                    {a.severity[0].toUpperCase() + a.severity.slice(1)} · {a.published_at ? timeAgo(a.published_at) : ''}
+                    {SEVERITY[a.severity].label} · {a.published_at ? timeAgo(a.published_at) : ''}
                   </small>
                 </div>
                 {isAdmin && (
-                  <button type="button" className="action-small" disabled={busy === a.id} onClick={() => act(a, 'cancel_alert')}>
+                  <button type="button" className="text-button" disabled={busy === a.id} onClick={() => act(a, 'cancel_alert')}>
                     Withdraw
                   </button>
                 )}
@@ -81,58 +133,11 @@ export function AlertsPanel({ profile, features, data, weather, quakes, weatherE
           </ul>
         )}
       </section>
-
-      {canDraft && <Composer profile={profile} initialTemplate={initialTemplate} onSaved={onChanged} />}
-
-      {canDraft && (
-        <section>
-          <h2 className="section-title">Waiting for approval</h2>
-          {error && (
-            <p className="error-text" role="alert">
-              {error}
-            </p>
-          )}
-          {pending.length === 0 ? (
-            <p className="empty-note">Nothing waiting.</p>
-          ) : (
-            <ul className="queue-list">
-              {pending.map((a) => (
-                <li key={a.id} className="queue-item">
-                  <span className="queue-icon" aria-hidden="true">{SEVERITY_ICON[a.severity]}</span>
-                  <div className="queue-main">
-                    <strong>{a.title}</strong>
-                    <small>
-                      {a.status} · {audienceLabel(a)} · {timeAgo(a.created_at)}
-                    </small>
-                  </div>
-                  <div className="queue-actions">
-                    {isAdmin && a.status === 'draft' && (
-                      <button type="button" className="action-small primary" disabled={busy === a.id} onClick={() => act(a, 'approve_alert')}>
-                        Approve
-                      </button>
-                    )}
-                    {isAdmin && a.status === 'approved' && (
-                      <button type="button" className="action-small primary" disabled={busy === a.id} onClick={() => act(a, 'publish_alert')}>
-                        Publish
-                      </button>
-                    )}
-                    {(isAdmin || (a.status === 'draft' && a.created_by === profile.id)) && (
-                      <button type="button" className="action-small" disabled={busy === a.id} onClick={() => act(a, 'cancel_alert')}>
-                        Cancel
-                      </button>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
     </div>
   );
 }
 
-function Composer({ profile, initialTemplate, onSaved }: { profile: Profile; initialTemplate: AlertTemplate | null; onSaved: () => void }) {
+function Composer({ profile, initialTemplate, onSaved, onClose }: { profile: Profile; initialTemplate: AlertTemplate | null; onSaved: () => void; onClose: () => void }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [severity, setSeverity] = useState<Alert['severity']>('advisory');
@@ -165,13 +170,18 @@ function Composer({ profile, initialTemplate, onSaved }: { profile: Profile; ini
     }
     setTitle('');
     setBody('');
-    setMessage(profile.role === 'school_admin' ? 'Draft saved. Approve and publish it below.' : 'Draft saved. A School Admin must approve it before it is published.');
+    setMessage(profile.role === 'school_admin' ? 'Draft saved. Approve and publish it above.' : 'Draft saved. A School Admin will approve it.');
     onSaved();
   }
 
   return (
-    <section className="composer">
-      <h2 className="section-title">New alert</h2>
+    <section className="card composer">
+      <div className="card-head">
+        <h2 className="section-title">New alert</h2>
+        <button type="button" className="text-button" onClick={onClose}>
+          Close
+        </button>
+      </div>
       <div className="chip-row" role="group" aria-label="Start from a template">
         {TEMPLATE_BUTTONS.map((t) => (
           <button type="button" key={t.key} className="filter-button" onClick={() => applyTemplate(t.key)}>
@@ -187,28 +197,35 @@ function Composer({ profile, initialTemplate, onSaved }: { profile: Profile; ini
         Message
         <textarea value={body} rows={4} maxLength={2000} onChange={(e) => setBody(e.target.value)} />
       </label>
-      <div className="chip-row" role="group" aria-label="Severity">
-        {(['info', 'advisory', 'urgent'] as const).map((s) => (
-          <button type="button" key={s} className={`filter-button${severity === s ? ' is-active' : ''}`} aria-pressed={severity === s} onClick={() => setSeverity(s)}>
-            {SEVERITY_ICON[s]} {s}
-          </button>
-        ))}
-      </div>
-      <div className="chip-row" role="group" aria-label="Audience">
-        {(['all', 'responders', 'role'] as const).map((s) => (
-          <button type="button" key={s} className={`filter-button${scope === s ? ' is-active' : ''}`} aria-pressed={scope === s} onClick={() => setScope(s)}>
-            {s === 'all' ? 'Everyone' : s === 'responders' ? 'School Admins' : 'One role'}
-          </button>
-        ))}
-        {scope === 'role' && (
-          <select className="role-select" value={targetRole} onChange={(e) => setTargetRole(e.target.value as Role)} aria-label="Role">
-            {ROLE_ORDER.map((r) => (
-              <option key={r} value={r}>
-                {roleDetails[r].label}
+      <div className="form-grid">
+        <label className="field">
+          Severity
+          <select className="role-select" value={severity} onChange={(e) => setSeverity(e.target.value as Alert['severity'])}>
+            {(['info', 'advisory', 'urgent'] as const).map((s) => (
+              <option key={s} value={s}>
+                {SEVERITY[s].label}
               </option>
             ))}
           </select>
-        )}
+        </label>
+        <label className="field">
+          Audience
+          <select className="role-select" value={scope === 'role' ? `role:${targetRole}` : scope} onChange={(e) => {
+            const v = e.target.value;
+            if (v.startsWith('role:')) {
+              setScope('role');
+              setTargetRole(v.slice(5) as Role);
+            } else setScope(v as Alert['target_scope']);
+          }}>
+            <option value="all">Everyone</option>
+            <option value="responders">School Admins</option>
+            {ROLE_ORDER.map((r) => (
+              <option key={r} value={`role:${r}`}>
+                Only {roleDetails[r].label}s
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       {message && <p className="notice">{message}</p>}
       <button type="button" className="big-button primary" disabled={saving || title.trim().length < 3 || body.trim().length < 3} onClick={save}>
@@ -221,5 +238,5 @@ function Composer({ profile, initialTemplate, onSaved }: { profile: Profile; ini
 function audienceLabel(a: Alert): string {
   if (a.target_scope === 'all') return 'Everyone';
   if (a.target_scope === 'responders') return 'School Admins';
-  return a.target_role ? roleDetails[a.target_role].label : 'One role';
+  return a.target_role ? `Only ${roleDetails[a.target_role].label}s` : 'One role';
 }

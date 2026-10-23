@@ -6,18 +6,15 @@ import type { Location, Profile } from '../lib/types';
 import type { Tab } from '../roles';
 import { CategoryGrid } from './CategoryGrid';
 
-type Saved = { feeling: Option; place: string | null };
-
 // Tell Us How You Feel. Tapping a feeling saves it straight away, with the time.
-// The comment box above the buttons is optional: whatever is typed there goes
-// along with the tap, and nothing has to be typed. The place is the person's
-// default location when it is still available (a feeling is not a location
-// report, so nobody is asked where they are).
+// The comment is optional: whatever is typed goes along with the tap. The place
+// is the person's default location when it is still available (a feeling is not
+// a location report, so nobody is asked where they are).
 export function FeelPanel({ profile, locations, onSent, onGo }: { profile: Profile; locations: Location[]; onSent: () => void; onGo: (tab: Tab, category?: string) => void }) {
   const [comment, setComment] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [saved, setSaved] = useState<Saved | null>(null);
+  const [saved, setSaved] = useState<Option | null>(null);
 
   const defaultId = profile.primary_location_id && locations.some((l) => l.id === profile.primary_location_id) ? profile.primary_location_id : null;
 
@@ -39,40 +36,34 @@ export function FeelPanel({ profile, locations, onSent, onGo }: { profile: Profi
       return;
     }
     setComment('');
-    setSaved({ feeling, place });
+    setSaved(feeling);
     onSent();
   }
 
   if (saved) {
-    const { feeling } = saved;
     return (
       <section className="report-flow" aria-live="polite">
         <div className="done-card">
-          <div className="done-icon" aria-hidden="true">{feeling.icon}</div>
-          <h2>Thank you for sharing</h2>
-          <p>
-            You told us you feel <strong>{feeling.label}</strong>. It is saved{saved.place ? ` with your location (${saved.place})` : ''}. Only School Admins can read it.
-          </p>
-          {feeling.value === 'need_support' && (
-            <>
-              <p>You do not have to handle this alone. Would you like someone to reach out?</p>
-              <button type="button" className="big-button primary" onClick={() => onGo('help', 'counseling_support')}>
-                Ask for counseling / support
-              </button>
-            </>
+          <div className="done-icon" aria-hidden="true">{saved.icon}</div>
+          <h2>Thanks for sharing</h2>
+          <p>Only School Admins can see how you feel.</p>
+          {saved.value === 'need_support' && (
+            <button type="button" className="big-button primary" onClick={() => onGo('help', 'counseling_support')}>
+              Talk to a counselor
+            </button>
           )}
-          {feeling.value === 'unsafe' && (
+          {saved.value === 'unsafe' && (
             <>
-              <p>If you are in danger right now, go to the nearest teacher or staff member. You can also tell us what is wrong:</p>
+              <p>In danger right now? Go to the nearest teacher.</p>
               <button type="button" className="big-button danger" onClick={() => onGo('help', 'safety_assistance')}>
                 Get Safety Assistance
               </button>
-              <button type="button" className="big-button primary" onClick={() => onGo('incident')}>
+              <button type="button" className="big-button secondary" onClick={() => onGo('incident')}>
                 Report an incident
               </button>
             </>
           )}
-          <button type="button" className="big-button ghost" onClick={() => setSaved(null)}>
+          <button type="button" className="text-button" onClick={() => setSaved(null)}>
             Done
           </button>
         </div>
@@ -83,11 +74,14 @@ export function FeelPanel({ profile, locations, onSent, onGo }: { profile: Profi
   return (
     <section className="quick-report">
       <h2 className="flow-question">How are you feeling today?</h2>
-      <p className="fine-print">Tap one. It saves right away. Adding a comment is optional.</p>
-      <label className="field feel-comment">
-        <span>Comment (optional)</span>
-        <textarea rows={2} maxLength={300} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Say more if you want to. You can leave this empty." />
-      </label>
+      <p className="fine-print">Tap one. It saves right away.</p>
+      <details className="confirm-more feel-comment">
+        <summary>Add a comment first (optional)</summary>
+        <label className="field">
+          <span className="sr-only">Comment</span>
+          <textarea rows={2} maxLength={300} value={comment} onChange={(e) => setComment(e.target.value)} />
+        </label>
+      </details>
       <CategoryGrid options={FEELINGS} label="How are you feeling" disabled={sending} onSelect={choose} />
       {sending && <p className="fine-print" aria-live="polite">Saving…</p>}
       {error && (
@@ -95,7 +89,6 @@ export function FeelPanel({ profile, locations, onSent, onGo }: { profile: Profi
           {error}
         </p>
       )}
-      <p className="fine-print">{defaultId ? `📍 Saved with your default location.` : 'No default location saved, so this is saved without a place.'}</p>
     </section>
   );
 }

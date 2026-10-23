@@ -43,7 +43,7 @@ export const FEATURE_GROUPS: { title: string; features: { key: Feature; label: s
       { key: 'alerts.draft', label: 'Draft alerts', hint: 'Write alerts for approval' },
       { key: 'alerts.approve', label: 'Approve alerts', hint: 'Approve, publish, and withdraw alerts' },
       { key: 'people.manage', label: 'People', hint: 'Assign positions, view the activity log' },
-      { key: 'setup.locations', label: 'Setup: locations', hint: 'Campus, buildings, rooms, and location types' },
+      { key: 'setup.locations', label: 'Setup: locations', hint: 'Campus, buildings, rooms, and place types' },
       { key: 'setup.user_types', label: 'Setup: positions', hint: 'Create positions, choose their role and features' },
     ],
   },
@@ -75,15 +75,11 @@ export function effectiveFeatures(role: Role, typeFeatures: string[] | null): Se
   return new Set(chosen.filter((f): f is Feature => ceiling.has(f as Feature)));
 }
 
-export type Nav = { primary: Tab[]; more: Tab[] };
-
-// Insight roles get Map and Analytics up front and everything else under
-// More. Other roles keep a short, flat list of tabs.
-// `simplified` is the Community Member layout: four big-button tabs (feelings,
-// incidents, help, things to know) with My Reports behind More. Each tab still
-// follows the position's features, so a position without `report.help` has no
-// Get Help tab.
-export function navFor(features: Set<Feature>, simplified = false): Nav {
+// The tabs a person sees, in sidebar order. Every tab follows the position's
+// features, so a position without `report.help` has no Get Help tab.
+// `simplified` is the Community Member layout: big-button tabs for feelings,
+// incidents, help, and updates, then My Reports.
+export function navFor(features: Set<Feature>, simplified = false): Tab[] {
   const has = (f: Feature) => features.has(f);
   if (simplified) {
     const open: Record<'feel' | 'incident' | 'help' | 'know' | 'mine', boolean> = {
@@ -93,8 +89,7 @@ export function navFor(features: Set<Feature>, simplified = false): Nav {
       know: has('alerts.view'),
       mine: REPORT.some(has),
     };
-    const primary = (['feel', 'incident', 'help', 'know'] as const).filter((t) => open[t]);
-    return { primary, more: open.mine ? ['mine'] : [] };
+    return (['feel', 'incident', 'help', 'know', 'mine'] as const).filter((t) => open[t]);
   }
   type StaffTab = Exclude<Tab, 'feel' | 'incident' | 'help' | 'know' | 'mine'>;
   const available: Record<StaffTab, boolean> = {
@@ -106,10 +101,9 @@ export function navFor(features: Set<Feature>, simplified = false): Nav {
     people: has('people.manage'),
     setup: has('setup.locations') || has('setup.user_types'),
   };
-  if (available.map) {
-    const more: StaffTab[] = ['queue', 'alerts', 'report', 'people', 'setup'];
-    return { primary: ['map', 'analytics'], more: more.filter((t) => available[t]) };
-  }
-  const order: StaffTab[] = ['setup', 'people', 'report', 'alerts', 'queue'];
-  return { primary: order.filter((t) => available[t]), more: [] };
+  // Insight roles start on the Map; others start on whatever they manage.
+  const order: StaffTab[] = available.map
+    ? ['map', 'analytics', 'queue', 'alerts', 'report', 'people', 'setup']
+    : ['setup', 'people', 'report', 'alerts', 'queue'];
+  return order.filter((t) => available[t]);
 }

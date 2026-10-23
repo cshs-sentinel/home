@@ -11,7 +11,7 @@ const LEVELS: Record<number, { label: string; tier: string; icon: string }> = {
   2: { label: 'Building', tier: '1st level', icon: '🏢' },
   3: { label: 'Area', tier: '2nd level', icon: '🧱' },
   4: { label: 'Room', tier: '3rd level', icon: '🚪' },
-  5: { label: 'Other location', tier: 'Inside a campus, building, or floor', icon: '📍' },
+  5: { label: 'Other place', tier: 'Inside a campus, building, or area', icon: '📍' },
 };
 const TIERS = [1, 2, 3, 4, 5];
 
@@ -19,7 +19,7 @@ type Section = 'locations' | 'layout' | 'types' | 'userTypes';
 
 export function SetupPanel({ profile, features, people, onPeopleChanged }: { profile: Profile; features: Set<Feature>; people: Profile[]; onPeopleChanged: () => Promise<void> }) {
   const sections: { key: Section; label: string }[] = [
-    ...(features.has('setup.locations') ? [{ key: 'locations' as const, label: 'Locations' }, { key: 'layout' as const, label: 'Map layout' }, { key: 'types' as const, label: 'Location types' }] : []),
+    ...(features.has('setup.locations') ? [{ key: 'locations' as const, label: 'Places' }, { key: 'layout' as const, label: 'Map layout' }, { key: 'types' as const, label: 'Place types' }] : []),
     ...(features.has('setup.user_types') ? [{ key: 'userTypes' as const, label: 'Positions' }] : []),
   ];
   const [section, setSection] = useState<Section>(sections[0]?.key ?? 'locations');
@@ -44,7 +44,7 @@ export function SetupPanel({ profile, features, people, onPeopleChanged }: { pro
 
   return (
     <div className="setup">
-      <div className="filter-row" role="tablist" aria-label="Setup sections">
+      <div className="segmented" role="tablist" aria-label="Setup sections">
         {sections.map((s) => (
           <button type="button" role="tab" key={s.key} aria-selected={section === s.key} className={`filter-button${section === s.key ? ' is-active' : ''}`} onClick={() => setSection(s.key)}>
             {s.label}
@@ -188,13 +188,13 @@ function LocationsSetup({ profile, data, onChanged }: { profile: Profile; data: 
   const activeCount = data.locations.filter((l) => l.status !== 'archived').length;
 
   return (
-    <section>
+    <section className="card">
       <div className="setup-head">
         <div>
-          <h2 className="section-title">Campus and places</h2>
-          <p className="empty-note">
-            {activeCount} active places. Places show up as location buttons when people report.
-          </p>
+          <h2 className="section-title">
+            Campus and places <span className="count">{activeCount}</span>
+          </h2>
+          <p className="empty-note">People pick from these places when they report.</p>
         </div>
         <button type="button" className="action-small primary" onClick={() => setEditor({ mode: 'add', parent: null })}>
           + Add campus
@@ -310,11 +310,11 @@ function LocationTypesSetup({ profile, data, onChanged }: { profile: Profile; da
   const usage = (id: string) => data.locations.filter((l) => l.category_id === id && l.status !== 'archived').length;
 
   return (
-    <section>
+    <section className="card">
       <div className="setup-head">
         <div>
-          <h2 className="section-title">Location types</h2>
-          <p className="empty-note">Campus › Building › Area › Room. Other locations (gates, fields, corridors, parking) can go inside a campus, building, or floor.</p>
+          <h2 className="section-title">Place types</h2>
+          <p className="empty-note">Campus › Building › Area › Room. Other places (gates, fields, parking) go inside a campus, building, or area.</p>
         </div>
         <button type="button" className="action-small primary" onClick={() => setEditing('new')}>
           + Add type
@@ -323,14 +323,13 @@ function LocationTypesSetup({ profile, data, onChanged }: { profile: Profile; da
       {editing === 'new' && <LocationTypeForm profile={profile} onDone={async (saved) => { setEditing(null); if (saved) await onChanged(); }} />}
       {TIERS.map((lvl) => {
         const group = data.types.filter((t) => t.level === lvl);
+        if (group.length === 0) return null;
         return (
           <div key={lvl} className="type-group">
             <h3>
-              <span aria-hidden="true">{LEVELS[lvl].icon}</span> {LEVELS[lvl].label} · {LEVELS[lvl].tier}
+              <span aria-hidden="true">{LEVELS[lvl].icon}</span> {LEVELS[lvl].label}
             </h3>
-            {group.length === 0 ? (
-              <p className="empty-note">No types at this level.</p>
-            ) : (
+            {(
               <ul className="queue-list">
                 {group.map((t) => (
                   <li key={t.id} className={`queue-item${t.is_active ? '' : ' is-archived'}`}>
@@ -379,7 +378,7 @@ function LocationTypeForm({ profile, type, inUse = false, onDone }: { profile: P
 
   return (
     <div className="setup-form">
-      <p className="setup-form-title">{type ? `Edit ${type.name}` : 'New location type'}</p>
+      <p className="setup-form-title">{type ? `Edit ${type.name}` : 'New place type'}</p>
       <div className="form-grid">
         <label className="field">
           Name
@@ -433,11 +432,11 @@ function UserTypesSetup({ profile, userTypes, people, onChanged }: { profile: Pr
   const sorted = [...userTypes].sort((a, b) => Number(b.is_system) - Number(a.is_system) || ROLE_ORDER.indexOf(a.base_role) - ROLE_ORDER.indexOf(b.base_role) || a.name.localeCompare(b.name));
 
   return (
-    <section>
+    <section className="card">
       <div className="setup-head">
         <div>
           <h2 className="section-title">Positions</h2>
-          <p className="empty-note">Every position is mapped to one of three roles: Community Member, School Admin, or System Admin. The role decides what data a person can reach; the features decide which menus and report buttons they see. Only Community Member positions can be opened for public sign-up.</p>
+          <p className="empty-note">Each position has a role (what data it can reach) and features (what it sees).</p>
         </div>
         <button type="button" className="action-small primary" onClick={() => setEditing('new')}>
           + New position
@@ -513,7 +512,7 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
   async function save() {
     setSaving(true);
     setError('');
-    const r = await saveUserType(profile, { id: type?.id, name, description, baseRole, features: [...chosen].filter((f) => allowed.has(f)), isActive: active, selectableAtSignup: signup, authorizedPrivileged: authorized, canApproveOwnLocation: canApprove });
+    const r = await saveUserType(profile, { id: type?.id, name, description, baseRole, features: [...chosen].filter((f) => allowed.has(f)), isActive: active, selectableAtSignup: signup && active, authorizedPrivileged: authorized, canApproveOwnLocation: canApprove });
     setSaving(false);
     if (r.error) setError(r.error);
     else onDone(true);
@@ -551,7 +550,7 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
       {baseRole === 'community' && (
         <>
           <label className="check-row">
-            <input type="checkbox" checked={signup} onChange={(e) => setSignup(e.target.checked)} /> Open for public sign-up
+            <input type="checkbox" checked={signup && active} disabled={!active} onChange={(e) => setSignup(e.target.checked)} /> People can pick it when they sign up
           </label>
           <label className="check-row">
             <input type="checkbox" checked={canApprove} onChange={(e) => setCanApprove(e.target.checked)} /> Can approve Community Member sign-ups at their own default location
@@ -560,8 +559,10 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
       )}
       <label className="field">
         Description (optional)
-        <input value={description} maxLength={300} onChange={(e) => setDescription(e.target.value)} placeholder="Who this type is for" />
+        <input value={description} maxLength={300} onChange={(e) => setDescription(e.target.value)} placeholder="Who this position is for" />
       </label>
+      <details className="disclosure">
+        <summary>Customize features ({[...chosen].filter((f) => allowed.has(f)).length} on)</summary>
       {FEATURE_GROUPS.map((group) => (
         <fieldset key={group.title} className="feature-group">
           <legend>{group.title}</legend>
@@ -579,9 +580,10 @@ function UserTypeForm({ profile, type, assigned, onDone }: { profile: Profile; t
           })}
         </fieldset>
       ))}
+      </details>
       {!type?.is_system && (
         <label className="check-row">
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Can be assigned to people and chosen at sign-up
+          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> Active (turn off to retire this position)
         </label>
       )}
       {error && (

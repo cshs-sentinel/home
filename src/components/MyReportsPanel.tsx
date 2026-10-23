@@ -36,76 +36,59 @@ export function MyReportsPanel({ profile, locations, incidents, checkIns, onChan
     setBusy(null);
   }
 
+  // One list, newest first: incident reports, help requests, and safe check-ins.
+  const rows = [
+    ...mine.map((i) => ({ when: i.created_at, node: (
+      <li key={i.id}>
+        <span aria-hidden="true">{iconFor(i.category)}</span>
+        <span className="activity-main">
+          <strong>{labelFor(i.category)}</strong>
+          <small>
+            {i.case_ref} · {placeLabel(i.location_id, locations)} · {timeAgo(i.created_at)}
+          </small>
+        </span>
+        <span className={`chip status-${i.status}`}>{INCIDENT_STATUS_LABEL[i.status]}</span>
+        {(i.status === 'pending_evaluation' || i.status === 'new') && (
+          <button type="button" className="text-button" disabled={busy === i.id} onClick={() => cancel(i)}>
+            Cancel
+          </button>
+        )}
+      </li>
+    ) })),
+    ...help.map((c) => ({ when: c.checked_in_at, node: (
+      <li key={c.id}>
+        <span aria-hidden="true">{iconFor(c.help_type ?? 'emergency_help')}</span>
+        <span className="activity-main">
+          <strong>{labelFor(c.help_type ?? 'emergency_help')}</strong>
+          <small>
+            {placeLabel(c.location_id, locations)} · {timeAgo(c.checked_in_at)}
+          </small>
+        </span>
+        <span className={`chip triage-${c.triage_status ?? 'awaiting_triage'}`}>{TRIAGE_LABELS[c.triage_status ?? 'awaiting_triage']}</span>
+      </li>
+    ) })),
+    ...safe.map((c) => ({ when: c.checked_in_at, node: (
+      <li key={c.id}>
+        <span aria-hidden="true">✅</span>
+        <span className="activity-main">
+          <strong>Checked in safe</strong>
+          <small>{timeAgo(c.checked_in_at)}</small>
+        </span>
+      </li>
+    ) })),
+  ].sort((a, b) => b.when.localeCompare(a.when));
+
   return (
-    <section className="my-reports">
-      <h2 className="section-title">My incident reports</h2>
-      {error && (
-        <p className="error-text" role="alert">
-          {error}
-        </p>
-      )}
-      {mine.length === 0 ? (
-        <p className="empty-note">You have not reported an incident.</p>
-      ) : (
-        <ul className="activity-list">
-          {mine.map((i) => (
-            <li key={i.id}>
-              <span aria-hidden="true">{iconFor(i.category)}</span>
-              <span className="activity-main">
-                <strong>{i.case_ref}</strong> · {labelFor(i.category)}
-                <small>
-                  {placeLabel(i.location_id, locations)} · {timeAgo(i.created_at)}
-                </small>
-              </span>
-              <span className={`chip status-${i.status}`}>{INCIDENT_STATUS_LABEL[i.status]}</span>
-              {(i.status === 'pending_evaluation' || i.status === 'new') && (
-                <button type="button" className="text-button" disabled={busy === i.id} onClick={() => cancel(i)}>
-                  Cancel
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <h2 className="section-title">My help requests</h2>
-      {help.length === 0 ? (
-        <p className="empty-note">You have not asked for help.</p>
-      ) : (
-        <ul className="activity-list">
-          {help.map((c) => (
-            <li key={c.id}>
-              <span aria-hidden="true">{iconFor(c.help_type ?? 'emergency_help')}</span>
-              <span className="activity-main">
-                <strong>{labelFor(c.help_type ?? 'emergency_help')}</strong>
-                <small>
-                  {placeLabel(c.location_id, locations)} · {timeAgo(c.checked_in_at)}
-                </small>
-              </span>
-              <span className={`chip triage-${c.triage_status ?? 'awaiting_triage'}`}>{TRIAGE_LABELS[c.triage_status ?? 'awaiting_triage']}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {safe.length > 0 && (
-        <>
-          <h2 className="section-title">Recent check-ins</h2>
-          <ul className="activity-list">
-            {safe.map((c) => (
-              <li key={c.id}>
-                <span aria-hidden="true">✅</span>
-                <span className="activity-main">
-                  <strong>Checked in safe</strong>
-                  <small>{new Date(c.checked_in_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</small>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
+    <div className="my-reports">
+      <section className="card">
+        {error && (
+          <p className="error-text" role="alert">
+            {error}
+          </p>
+        )}
+        {rows.length === 0 ? <p className="empty-note">Nothing sent yet.</p> : <ul className="activity-list">{rows.map((r) => r.node)}</ul>}
+      </section>
       <DefaultLocationCard profile={profile} locations={locations} onChanged={onProfileChanged} />
-    </section>
+    </div>
   );
 }

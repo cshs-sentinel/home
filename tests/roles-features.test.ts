@@ -46,13 +46,12 @@ test('a person without a position gets the role defaults', () => {
 
 test('navigation: community sees Report and Alerts, School Admin gets Map and Analytics first', () => {
   const community = navFor(effectiveFeatures('community', null));
-  assert.deepEqual(community.primary.sort(), ['alerts', 'report']);
-  assert.deepEqual(community.more, []);
+  assert.deepEqual([...community].sort(), ['alerts', 'report']);
   const admin = navFor(effectiveFeatures('school_admin', null));
-  assert.deepEqual(admin.primary, ['map', 'analytics']);
-  assert.ok(admin.more.includes('queue') && admin.more.includes('people'));
+  assert.deepEqual(admin.slice(0, 2), ['map', 'analytics']);
+  assert.ok(admin.includes('queue') && admin.includes('people'));
   const system = navFor(effectiveFeatures('system_admin', null));
-  assert.ok(system.primary.includes('setup') && system.primary.includes('people'));
+  assert.ok(system.includes('setup') && system.includes('people'));
 });
 
 const place = (id: string, name: string, parent: string | null): Location => ({

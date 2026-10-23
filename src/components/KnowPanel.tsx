@@ -3,6 +3,7 @@ import type { Profile } from '../lib/types';
 import type { Feature } from '../lib/features';
 import type { Quake, WeatherSnapshot } from '../lib/weather';
 import { AlertsPanel } from './AlertsPanel';
+import { WeatherPanel } from './WeatherPanel';
 
 // General-purpose guidance that is true for any school. Anything specific to
 // this campus belongs in an announcement from a School Admin (shown above).
@@ -10,7 +11,7 @@ const PROCEDURES: { icon: string; title: string; steps: string[] }[] = [
   {
     icon: '🔥',
     title: 'Fire or smoke',
-    steps: ['Stay calm and leave by the nearest safe exit.', 'Do not use elevators and do not go back inside for belongings.', 'Go to your assembly area and tell your teacher you are out.', 'Report it: Report an Incident › Fire / Smoke, or Get Help › Emergency Help.'],
+    steps: ['Stay calm and leave by the nearest safe exit.', 'Do not use elevators and do not go back inside for belongings.', 'Go to your assembly area and tell your teacher you are out.', 'Report it: Report › Fire / Smoke, or Get Help › Emergency Help.'],
   },
   {
     icon: '🌏',
@@ -51,40 +52,41 @@ type Props = {
   onChanged: () => Promise<void>;
 };
 
-// Things You Need to Know Now: weather advisories, school alerts and
-// announcements (the existing alerts view), then safety reminders and emergency
-// procedures.
+// Things You Need to Know Now: the weather, school alerts and announcements,
+// then one collapsible safety guide (reminders and emergency procedures).
 export function KnowPanel({ profile, features, data, weather, quakes, weatherError, onChanged }: Props) {
   return (
     <div className="know">
-      <AlertsPanel profile={profile} features={features} data={data} weather={weather} quakes={quakes} weatherError={weatherError} initialTemplate={null} onChanged={onChanged} />
+      <WeatherPanel weather={weather} quakes={quakes} error={weatherError} />
+      <AlertsPanel profile={profile} features={features} data={data} initialTemplate={null} onChanged={onChanged} />
 
-      <section>
-        <h2 className="section-title">Safety reminders</h2>
-        <ul className="reminder-list">
-          {REMINDERS.map((r) => (
-            <li key={r}>{r}</li>
-          ))}
-        </ul>
-      </section>
-
-      <section>
-        <h2 className="section-title">Emergency procedures</h2>
-        <p className="fine-print">General guidance. Your school may post its own procedures in the announcements above.</p>
+      <section className="card">
+        <h2 className="section-title">Safety guide</h2>
         <div className="procedure-list">
+          <details className="procedure">
+            <summary>
+              <span aria-hidden="true">✅</span> Everyday reminders
+            </summary>
+            <ul>
+              {REMINDERS.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </details>
           {PROCEDURES.map((p) => (
             <details key={p.title} className="procedure">
               <summary>
                 <span aria-hidden="true">{p.icon}</span> {p.title}
               </summary>
               <ol>
-                {p.steps.map((s) => (
-                  <li key={s}>{s}</li>
+                {p.steps.map((step) => (
+                  <li key={step}>{step}</li>
                 ))}
               </ol>
             </details>
           ))}
         </div>
+        <p className="fine-print">General guidance. Your school may post its own procedures as an alert.</p>
       </section>
     </div>
   );

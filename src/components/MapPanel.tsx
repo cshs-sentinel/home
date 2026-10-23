@@ -5,7 +5,8 @@ import { blockOf, blockStyle, childrenIndex, pathTo, placeLabel, subtreeIds } fr
 import { OPEN_INCIDENT, since } from '../lib/analytics';
 import type { Role } from '../roles';
 import { NestedMap } from './NestedMap';
-import { RangeFilter, type Range } from './AnalyticsPanel';
+import type { Range } from './AnalyticsPanel';
+import { INCIDENT_STATUS_LABEL } from './MyReportsPanel';
 import { timeAgo } from './QueuePanel';
 
 type Layer = 'all' | 'incidents' | 'hazards' | 'concerns' | 'help' | 'sentiment';
@@ -20,7 +21,7 @@ const LAYERS: { key: Layer; label: string; roles?: Role[] }[] = [
   { key: 'hazards', label: 'Hazards' },
   { key: 'concerns', label: 'Concerns and suggestions' },
   { key: 'help', label: 'Help requests', roles: ['school_admin'] },
-  { key: 'sentiment', label: 'Sentiment', roles: ['school_admin'] },
+  { key: 'sentiment', label: 'Feelings (stress)', roles: ['school_admin'] },
 ];
 
 const TYPE_FILTERS: Partial<Record<Layer, Option[]>> = {
@@ -38,9 +39,9 @@ const UNITS: Record<Layer, string> = {
   sentiment: 'average stress',
 };
 
-type Props = { role: Role; days: Range; onDays: (d: Range) => void; data: SchoolData };
+type Props = { role: Role; days: Range; data: SchoolData };
 
-export function MapPanel({ role, days, onDays, data }: Props) {
+export function MapPanel({ role, days, data }: Props) {
   const locations = data.locations;
   const layers = LAYERS.filter((l) => !l.roles || l.roles.includes(role));
   const [layer, setLayer] = useState<Layer>('all');
@@ -135,12 +136,10 @@ export function MapPanel({ role, days, onDays, data }: Props) {
   const shaded = isStress ? shadedStats.some((st) => st.value !== null) : shadedStats.some((st) => (st.value ?? 0) > 0);
   const format = (s: Stats) => (s.value === null ? '—' : isStress ? s.value.toFixed(1) : String(s.value));
   const unit = UNITS[layer];
-  const directHere = items.filter((i) => i.locationId === currentId);
   const selectedLoc = selected ? locations.find((l) => l.id === selected) ?? null : null;
   const selectedStats = selectedLoc ? statsFor(selectedLoc.id) : null;
   const roots = (index.get(null) ?? []).filter((r) => (index.get(r.id) ?? []).length > 0);
   const filters = layer === 'sentiment' ? [{ value: 'negative', label: 'Negative feelings only', icon: '' }] : TYPE_FILTERS[layer];
-  const canOpenOnly = true;
   const go = (id: string) => {
     setParentId(id);
     setSelected(null);
@@ -148,8 +147,7 @@ export function MapPanel({ role, days, onDays, data }: Props) {
 
   return (
     <div className="map-panel">
-      <div className="map-toolbar">
-        <RangeFilter days={days} onDays={onDays} />
+      <div className="panel-toolbar">
         <div className="segmented" role="group" aria-label="Map view">
           <button type="button" className={`filter-button${view === 'campus' ? ' is-active' : ''}`} aria-pressed={view === 'campus'} onClick={() => { setView('campus'); setSelected(null); }}>
             Whole campus
@@ -163,35 +161,23 @@ export function MapPanel({ role, days, onDays, data }: Props) {
       <section className="chart-card map-card">
         <header>
           <h3>Campus map</h3>
-          <p>
-            {view === 'campus'
-              ? `Every building, floor, and room at once, shaded by ${unit} in the last ${days} days. Tap any block for details.`
-              : `Shaded by ${unit} in the last ${days} days, counting everything inside each place. Tap a block for details.`}
-          </p>
+          <p>Shaded by {unit}, last {days} days. Tap a place for details.</p>
         </header>
 
 
-        <div className="map-controls" role="group" aria-label="Heatmap type">
-          <span className="control-label">Heatmap</span>
-          <select className="role-select layer-select" value={layer} onChange={(e) => chooseLayer(e.target.value as Layer)} aria-label="Heatmap type">
-            {layers.map((l) => (
-              <option key={l.key} value={l.key}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-          <div className="chip-row layer-chips">
-            {layers.map((l) => (
-              <button type="button" key={l.key} className={`filter-button${layer === l.key ? ' is-active' : ''}`} aria-pressed={layer === l.key} onClick={() => chooseLayer(l.key)}>
-                {l.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {(filters || canOpenOnly) && (
-          <div className="map-controls" role="group" aria-label="Filter">
-            <span className="control-label">Show</span>
+        <div className="map-controls">
+          <label className="field layer-field">
+            <span>Show</span>
+            <select className="role-select" value={layer} onChange={(e) => chooseLayer(e.target.value as Layer)}>
+              {layers.map((l) => (
+                <option key={l.key} value={l.key}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <details className="map-filters">
+            <summary>Filters{typeFilter || openOnly ? ' · on' : ''}</summary>
             <div className="chip-row">
               {filters && (
                 <>
@@ -206,14 +192,12 @@ export function MapPanel({ role, days, onDays, data }: Props) {
                   ))}
                 </>
               )}
-              {canOpenOnly && (
-                <label className="check-row open-only">
-                  <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} /> Still needs a response
-                </label>
-              )}
+              <label className="check-row">
+                <input type="checkbox" checked={openOnly} onChange={(e) => setOpenOnly(e.target.checked)} /> Still needs a response
+              </label>
             </div>
-          </div>
-        )}
+          </details>
+        </div>
 
         {roots.length > 1 && (view === 'campus' || path.length <= 1) && (
           <nav className="crumbs" aria-label="Campus">
@@ -317,7 +301,7 @@ export function MapPanel({ role, days, onDays, data }: Props) {
                           {placeLabel(i.locationId, locations)} · {timeAgo(i.when)}
                         </small>
                       </span>
-                      <span className={`chip status-${i.status}`}>{i.status.replace('_', ' ')}</span>
+                      <span className={`chip status-${i.status}`}>{(INCIDENT_STATUS_LABEL as Record<string, string>)[i.status] ?? i.status.replace(/_/g, ' ')}</span>
                     </li>
                   ))}
               </ul>
@@ -326,19 +310,8 @@ export function MapPanel({ role, days, onDays, data }: Props) {
           </div>
         )}
 
-        {view === 'level' && (unplaced.length > 0 || directHere.length > 0) && (
-          <div className="chip-row map-extra">
-            {directHere.length > 0 && <span className="chip">Filed at {current.name} itself: {directHere.length}</span>}
-            {unplaced.map((k) => (
-              <span key={k.id} className="chip">
-                {k.name} (not on map): {format(blockStats.get(k.id)!)}
-              </span>
-            ))}
-          </div>
-        )}
-
         <details className="table-view">
-          <summary>View as table</summary>
+          <summary>Show as table</summary>
           <table>
             <thead>
               <tr>
@@ -352,7 +325,10 @@ export function MapPanel({ role, days, onDays, data }: Props) {
                 const stats = statsFor(id);
                 return (
                   <tr key={id}>
-                    <td>{view === 'campus' ? placeLabel(id, locations) : locations.find((l) => l.id === id)?.name}</td>
+                    <td>
+                      {view === 'campus' ? placeLabel(id, locations) : locations.find((l) => l.id === id)?.name}
+                      {view === 'level' && unplaced.some((u) => u.id === id) && <small> (not on map)</small>}
+                    </td>
                     <td>{format(stats)}</td>
                     {isStress && <td>{stats.count}</td>}
                   </tr>
