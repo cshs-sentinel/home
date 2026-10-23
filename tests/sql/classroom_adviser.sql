@@ -6,8 +6,7 @@
 insert into zz_test.fx select 'school_a', id::text from public.schools where status = 'active' order by created_at limit 1;
 insert into public.locations (school_id, parent_id, category_id, name)
 select zz_test.f('school_a')::uuid, f.id, (select id from public.location_categories where school_id = f.school_id and name = 'Classroom'), 'ZZ Room ' || n
-from public.locations f, generate_series(1, 2) n
-where f.school_id = zz_test.f('school_a')::uuid and f.name = '1st Floor';
+from (select f.id, f.school_id from public.locations f join public.location_categories fc on fc.id = f.category_id where f.school_id = zz_test.f('school_a')::uuid and f.status = 'active' and fc.level = 3 order by f.name limit 1) f, generate_series(1, 2) n;
 insert into zz_test.fx select 'room' || right(name, 1), id::text from public.locations where name like 'ZZ Room %' and school_id = zz_test.f('school_a')::uuid;
 insert into zz_test.fx select 'student', id::text from public.user_types where name = 'Student' and school_id = zz_test.f('school_a')::uuid;
 insert into zz_test.fx select 'adviser', id::text from public.user_types where name = 'Classroom Adviser' and school_id = zz_test.f('school_a')::uuid;
@@ -28,6 +27,9 @@ select zz_test.rec('C00 fixtures: adviser at room 1, two pending sign-ups (rooms
   and zz_test.val($q$ select status from public.profiles where id = zz_test.uid('zz-pend-a@test.invalid') $q$) = 'pending', '');
 
 -- The adviser sees only their own location's active pending accounts ---------------
+-- Test accounts, created inside this rolled-back transaction (demo logins are retired).
+reset role;
+select zz_test.reg('zz-sa@test.invalid', jsonb_build_object('provision_secret', zz_test.sval('select secret from public._provision_secrets'), 'designation_id', (select id from public.user_types where name = 'School Admin' and school_id = zz_test.f('school_a')::uuid), 'display_name', 'ZZ School Admin'));
 select zz_test.use('zz-adviser@test.invalid');
 select zz_test.rec('C01 the adviser lists only active pending accounts at their own location',
   zz_test.val($q$ select string_agg(display_name, ',' order by display_name) from public.pending_in_my_location() $q$) = 'ZZ Pend A',
@@ -56,7 +58,7 @@ select zz_test.rec('C06 a Community Member without the ability lists nothing and
   and zz_test.refused(zz_test.try($q$ select public.approve_registration(zz_test.uid('zz-pend-b@test.invalid')) $q$), 'permission denied'), '');
 
 -- A School Admin still approves anywhere in the school ------------------------------
-select zz_test.use('demo.schooladmin@sentinel.test');
+select zz_test.use('zz-sa@test.invalid');
 select zz_test.rec('C07 a School Admin approves a pending account at any location',
   zz_test.try($q$ select public.approve_registration(zz_test.uid('zz-pend-b@test.invalid')) $q$) = 'ok'
   and zz_test.val($q$ select status from public.profiles where id = zz_test.uid('zz-pend-b@test.invalid') $q$) = 'approved', '');

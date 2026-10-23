@@ -35,6 +35,7 @@ const SUITES = [
   { title: 'three-role database rules (rolled back)', file: 'three_roles.sql', minimum: 60 },
   { title: 'button-based reporting rules (rolled back)', file: 'button_reporting.sql', minimum: 30 },
   { title: 'Classroom Adviser approval rules (rolled back)', file: 'classroom_adviser.sql', minimum: 7 },
+  { title: 'public sign-up email rules (rolled back)', file: 'signup_email.sql', minimum: 5 },
 ];
 
 for (const suite of SUITES) {

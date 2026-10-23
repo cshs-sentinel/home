@@ -9,6 +9,8 @@ import { PlacePicker } from './PlacePicker';
 // Location, ID No., and Gender. The database decides the role from the
 // Member type (the designation) and refuses anything that is not open for
 // sign-up.
+const VALID_EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+([.][A-Za-z0-9-]+)*[.][A-Za-z]{2,}$/;
+
 export function SignUpCard({ onLogin }: { onLogin: () => void }) {
   const [options, setOptions] = useState<RegistrationOptions | null>(null);
   const [loadError, setLoadError] = useState('');
@@ -39,6 +41,11 @@ export function SignUpCard({ onLogin }: { onLogin: () => void }) {
 
   async function submit() {
     if (!locationId || !gender) return;
+    // Same rule the database enforces (handle_new_user): a well-formed address with a dot in the domain.
+    if (!VALID_EMAIL.test(email.trim())) {
+      setError('Enter a valid email address');
+      return;
+    }
     setSubmitting(true);
     setError('');
     const r = await registerAccount({ email, password, displayName: name, designationId, locationId, idNumber, gender });

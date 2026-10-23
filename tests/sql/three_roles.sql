@@ -9,8 +9,7 @@ insert into zz_test.fx select 'school_a', id::text from public.schools where sta
 -- Four throwaway rooms under the school's first floor (rolled back with everything else).
 insert into public.locations (school_id, parent_id, category_id, name)
 select zz_test.f('school_a')::uuid, f.id, (select id from public.location_categories where school_id = f.school_id and name = 'Classroom'), 'ZZ Room ' || n
-from public.locations f, generate_series(1, 4) n
-where f.school_id = zz_test.f('school_a')::uuid and f.name = '1st Floor';
+from (select f.id, f.school_id from public.locations f join public.location_categories fc on fc.id = f.category_id where f.school_id = zz_test.f('school_a')::uuid and f.status = 'active' and fc.level = 3 order by f.name limit 1) f, generate_series(1, 4) n;
 insert into zz_test.fx select 'room' || right(name, 1), id::text from public.locations where name like 'ZZ Room %' and school_id = zz_test.f('school_a')::uuid;
 update public.locations set status = 'inactive' where id = zz_test.f('room3')::uuid;
 update public.locations set access_level = 'restricted' where id = zz_test.f('room4')::uuid;
@@ -113,7 +112,12 @@ select zz_test.rec('T20 visitors cannot change a default location',
   zz_test.try(format($q$ select public.set_my_default_location(%L) $q$, zz_test.f('room1'))));
 
 -- 4. Community Member cannot elevate themselves ------------------------------------
-select zz_test.use('demo.student@sentinel.test');
+-- Test accounts, created inside this rolled-back transaction (demo logins are retired).
+reset role;
+select zz_test.reg('zz-member@test.invalid', jsonb_build_object('provision_secret', zz_test.sval('select secret from public._provision_secrets'), 'designation_id', (select id from public.user_types where name = 'Student' and school_id = zz_test.f('school_a')::uuid), 'display_name', 'ZZ Member'));
+select zz_test.reg('zz-sa@test.invalid', jsonb_build_object('provision_secret', zz_test.sval('select secret from public._provision_secrets'), 'designation_id', (select id from public.user_types where name = 'School Admin' and school_id = zz_test.f('school_a')::uuid), 'display_name', 'ZZ School Admin'));
+select zz_test.reg('zz-sys@test.invalid', jsonb_build_object('provision_secret', zz_test.sval('select secret from public._provision_secrets'), 'designation_id', (select id from public.user_types where name = 'System Admin' and school_id = zz_test.f('school_a')::uuid), 'display_name', 'ZZ System Admin'));
+select zz_test.use('zz-member@test.invalid');
 select zz_test.rec('T21 Community: cannot update their own role',
   zz_test.refused(zz_test.try($q$ update public.profiles set role = 'system_admin' where id = auth.uid() $q$), 'permission denied'),
   zz_test.try($q$ update public.profiles set role = 'system_admin' where id = auth.uid() $q$));
@@ -191,7 +195,7 @@ select zz_test.rec('T41 Community: cannot set incident priority',
   zz_test.try($q$ select public.set_incident_priority((select id from public.incidents where description = 'ZZ test incident'), 3, 3, 3) $q$));
 
 -- 7. School Admin (coordinators and responders) -----------------------------------------
-select zz_test.use('demo.schooladmin@sentinel.test');
+select zz_test.use('zz-sa@test.invalid');
 select zz_test.rec('T42 School Admin reads individual feelings',
   zz_test.val('select count(*) from public.submissions where kind = ''sentiment''')::int >= 1, zz_test.val('select count(*) from public.submissions where kind = ''sentiment'''));
 select zz_test.rec('T43 School Admin cannot see another school''s reports, places, positions, or people',
@@ -219,7 +223,7 @@ select zz_test.rec('T49 School Admin cannot assign a System Admin position',
 select zz_test.rec('T50 School Admin cannot change their own position',
   zz_test.refused(zz_test.try(format($q$ select public.admin_set_user_type(auth.uid(), %L) $q$, zz_test.f('student'))), 'your own'), '');
 select zz_test.rec('T51 School Admin cannot change a System Admin''s position',
-  zz_test.refused(zz_test.try(format($q$ select public.admin_set_user_type(zz_test.uid('demo.systemadmin@sentinel.test'), %L) $q$, zz_test.f('student'))), 'only a System Admin'), '');
+  zz_test.refused(zz_test.try(format($q$ select public.admin_set_user_type(zz_test.uid('zz-sys@test.invalid'), %L) $q$, zz_test.f('student'))), 'only a System Admin'), '');
 select zz_test.rec('T52 School Admin cannot give anyone a School Admin position (only a System Admin creates admins)',
   zz_test.refused(zz_test.try(format($q$ select public.admin_set_user_type(zz_test.uid('zz-two@test.invalid'), %L) $q$, zz_test.f('school_admin_t'))), 'only a System Admin')
   and zz_test.val($q$ select role::text from public.profiles where id = zz_test.uid('zz-two@test.invalid') $q$) = 'community',
@@ -230,7 +234,7 @@ select zz_test.rec('T53 School Admin cannot assign positions across schools',
 -- 8. System Admin configures positions ---------------------------------------------------------
 reset role;
 select zz_test.reg('zz-teacher@test.invalid', zz_test.meta('teacher', 'room1')) as registered;
-select zz_test.use('demo.systemadmin@sentinel.test');
+select zz_test.use('zz-sys@test.invalid');
 select zz_test.rec('T54 System Admin creates a position mapped to Community Member and opens it for sign-up',
   zz_test.try(format($q$ insert into public.user_types (school_id, name, base_role, features, selectable_at_signup) values (%L, 'ZZ Visitor', 'community', '{report.safe,alerts.view}', true) $q$, zz_test.f('school_a'))) = 'ok', '');
 select zz_test.rec('T55 System Admin creates a position mapped to School Admin',

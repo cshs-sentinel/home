@@ -8,8 +8,7 @@
 insert into zz_test.fx select 'school_a', id::text from public.schools where status = 'active' order by created_at limit 1;
 insert into public.locations (school_id, parent_id, category_id, name)
 select zz_test.f('school_a')::uuid, f.id, (select id from public.location_categories where school_id = f.school_id and name = 'Classroom'), 'ZZ Room ' || n
-from public.locations f, generate_series(1, 3) n
-where f.school_id = zz_test.f('school_a')::uuid and f.name = '1st Floor';
+from (select f.id, f.school_id from public.locations f join public.location_categories fc on fc.id = f.category_id where f.school_id = zz_test.f('school_a')::uuid and f.status = 'active' and fc.level = 3 order by f.name limit 1) f, generate_series(1, 3) n;
 insert into zz_test.fx select 'room' || right(name, 1), id::text from public.locations where name like 'ZZ Room %' and school_id = zz_test.f('school_a')::uuid;
 update public.locations set status = 'inactive' where id = zz_test.f('room3')::uuid;
 insert into zz_test.fx select 'student', id::text from public.user_types where name = 'Student' and school_id = zz_test.f('school_a')::uuid;
@@ -97,6 +96,9 @@ select zz_test.rec('B00 fixtures: school, rooms, second school, five accounts',
   and zz_test.uid('zz-ra@test.invalid') is not null and zz_test.uid('zz-pending@test.invalid') is not null, '');
 
 -- Incident categories, Pending Evaluation, default priority --------------------
+-- Test accounts, created inside this rolled-back transaction (demo logins are retired).
+reset role;
+select zz_test.reg('zz-sa@test.invalid', jsonb_build_object('provision_secret', zz_test.sval('select secret from public._provision_secrets'), 'designation_id', (select id from public.user_types where name = 'School Admin' and school_id = zz_test.f('school_a')::uuid), 'display_name', 'ZZ School Admin'));
 select zz_test.use('zz-ra@test.invalid');
 insert into zz_test.fx values ('r_incident_loop', zz_test.incident_loop());
 select zz_test.rec('B01 all ten category buttons save, start as Pending Evaluation, and get their default S/U/A',
@@ -187,7 +189,7 @@ select zz_test.rec('B25 the reporter can cancel their own report while it is pen
   zz_test.try($q$ select public.transition_incident((select id from public.incidents where description = 'ZZ cheat'), 'cancelled', 'Cancelled by reporter') $q$) = 'ok', '');
 
 -- Responders: notification, visibility, validate, dismiss, triage ----------------
-select zz_test.use('demo.schooladmin@sentinel.test');
+select zz_test.use('zz-sa@test.invalid');
 select zz_test.rec('B26 a School Admin sees every pending report, including other people''s',
   zz_test.val($q$ select count(*) from public.incidents where status = 'pending_evaluation' $q$)::int >= 2, zz_test.val($q$ select count(*) from public.incidents where status = 'pending_evaluation' $q$));
 select zz_test.rec('B27 a School Admin sees help requests, with their type and triage status, at once',
