@@ -141,6 +141,16 @@ function Evaluation({ incident, data, onChanged }: { incident: Incident; data: S
           <p>
             P = {scores.severity} + {scores.urgency} + {scores.affected} = <strong>{total}</strong>
           </p>
+          {incident.priority_basis && incident.priority_basis.length > 0 && (
+            <div className="eval-basis">
+              <h4>{incident.priority_set_by === null ? 'How the system read this report' : 'System reading before review'}</h4>
+              <ul>
+                {incident.priority_basis.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
         <section className="eval-priority" style={{ '--priority': p.color } as CSSProperties} aria-live="polite">
           <h3>Assigned Priority</h3>
@@ -151,7 +161,7 @@ function Evaluation({ incident, data, onChanged }: { incident: Incident; data: S
             </strong>
           </p>
           <p>{p.action}</p>
-          {(!saved || incident.priority_set_by === null) && <p className="fine-print">{saved ? 'System default for this category. Save to confirm.' : 'Not saved yet.'}</p>}
+          {(!saved || incident.priority_set_by === null) && <p className="fine-print">{saved ? 'Scored automatically from the report. Save to confirm.' : 'Not saved yet.'}</p>}
         </section>
       </div>
 

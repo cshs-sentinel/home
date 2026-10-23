@@ -36,6 +36,7 @@ const SUITES = [
   { title: 'button-based reporting rules (rolled back)', file: 'button_reporting.sql', minimum: 30 },
   { title: 'Classroom Adviser approval rules (rolled back)', file: 'classroom_adviser.sql', minimum: 7 },
   { title: 'public sign-up email rules (rolled back)', file: 'signup_email.sql', minimum: 5 },
+  { title: 'evidence-based automatic priority (rolled back)', file: 'evidence_priority.sql', minimum: 13 },
 ];
 
 for (const suite of SUITES) {

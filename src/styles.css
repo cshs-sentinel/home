@@ -450,6 +450,9 @@ details.disclosure > :not(summary) { margin-top: 8px; }
 .eval-calc, .eval-priority { padding: 14px 16px; border-radius: 12px; }
 .eval-calc { background: color-mix(in srgb, var(--link) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--link) 22%, var(--surface)); }
 .eval-calc p { margin: 10px 0 0; font-family: var(--font-mono); font-size: 18px; }
+.eval-basis { margin-top: 12px; padding-top: 10px; border-top: 1px dashed color-mix(in srgb, var(--link) 30%, var(--surface)); }
+.eval-basis h4 { margin: 0 0 6px; font-size: 13px; color: var(--heading); }
+.eval-basis ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 1.45; color: var(--muted); }
 .eval-priority { background: color-mix(in srgb, var(--priority) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--priority) 45%, var(--surface)); }
 .eval-priority > h3 { color: var(--priority); }
 .eval-badge { display: inline-block; margin: 10px 0 8px; padding: 6px 22px; border-radius: 999px; background: var(--priority); color: #ffffff; font-size: 18px; font-weight: 700; }

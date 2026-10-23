@@ -96,8 +96,10 @@ export type Incident = {
   priority_affected: number | null;
   priority_index: number | null;
   priority_level: 'low' | 'moderate' | 'high' | 'critical' | null;
-  // null while the factors are still the system defaults for the category
+  // null while the factors are still the system's own reading of the report
   priority_set_by: string | null;
+  // why the system scored it as it did, one sentence per adjustment
+  priority_basis?: string[] | null;
 };
 
 export type TriageStatus = 'urgent' | 'awaiting_triage' | 'responding' | 'resolved';

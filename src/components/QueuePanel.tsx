@@ -134,16 +134,16 @@ function IncidentRow({ incident, place, busy, onMove, onPriority }: { incident: 
   );
 }
 
-// `auto` marks the system default for the report's category: a responder has not
+// `auto` marks the system's own reading of the report: a responder has not
 // confirmed or changed it yet.
 export function PriorityChip({ level, index, auto = false }: { level: PriorityLevel | null; index: number | null; auto?: boolean }) {
   if (!level || index === null) return <span className="chip priority-chip is-unrated">Not rated</span>;
   const p = PRIORITY_LEVELS[level];
   return (
-    <span className="chip priority-chip" style={{ '--priority': p.color } as CSSProperties} title={`Priority Index ${index} of 12 · ${p.label} (${p.range})${auto ? ' · system default for this category, not yet confirmed' : ''}`}>
+    <span className="chip priority-chip" style={{ '--priority': p.color } as CSSProperties} title={`Priority Index ${index} of 12 · ${p.label} (${p.range})${auto ? ' · scored automatically from the report, not yet confirmed' : ''}`}>
       <span className="priority-dot" aria-hidden="true" />
       {p.label} · {index}
-      {auto && <span className="priority-auto"> · default</span>}
+      {auto && <span className="priority-auto"> · auto</span>}
     </span>
   );
 }
