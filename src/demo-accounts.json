@@ -1,31 +1,15 @@
 {
   "password": "Sentinel!Demo1",
   "schoolId": "11111111-1111-1111-1111-111111111111",
-  "accounts": [
-    {
-      "role": "community",
-      "designation": "Student",
-      "email": "demo.student@sentinel.test",
-      "displayName": "Demo Community Member"
-    },
-    {
-      "role": "school_admin",
-      "designation": "School Admin",
-      "email": "demo.schooladmin@sentinel.test",
-      "displayName": "Demo School Admin"
-    },
-    {
-      "role": "system_admin",
-      "designation": "System Admin",
-      "email": "demo.systemadmin@sentinel.test",
-      "displayName": "Demo System Admin"
-    }
-  ],
+  "accounts": [],
   "retired": [
     "demo.nonteaching@sentinel.test",
     "demo.teacher@sentinel.test",
     "demo.security@sentinel.test",
     "demo.drrm@sentinel.test",
-    "demo.guidance@sentinel.test"
+    "demo.guidance@sentinel.test",
+    "demo.student@sentinel.test",
+    "demo.schooladmin@sentinel.test",
+    "demo.systemadmin@sentinel.test"
   ]
 }

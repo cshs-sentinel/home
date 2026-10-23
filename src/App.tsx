@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { roleDetails, TAB_LABELS, type Role, type Tab } from './roles';
-import demoAccounts from './demo-accounts.json';
+import demoAccountList from './demo-accounts.json';
+
+// The list is empty once every demo login has been retired; the login card then hides the demo button.
+const demoAccounts = demoAccountList as { password: string; accounts: { role: string; email: string; displayName: string }[] };
 import { THEME_LABELS, useTheme } from './theme';
 import { SignUpCard } from './components/SignUpCard';
 import type { Profile, UserType } from './lib/types';
@@ -132,9 +135,11 @@ function LoginCard({ onSignUp }: { onSignUp: () => void }) {
       <button type="button" className="link-button" onClick={onSignUp}>
         New here? Create a community account
       </button>
+      {demoAccounts.accounts.length > 0 && (
       <button type="button" className="link-button" onClick={() => setShowDemo((v) => !v)}>
         {showDemo ? 'Hide demo accounts' : 'Try a demo account for each role'}
       </button>
+      )}
       {showDemo && (
         <ul className="demo-accounts">
           {demoAccounts.accounts.map((account) => (
