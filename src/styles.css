@@ -363,7 +363,7 @@ details.disclosure > :not(summary) { margin-top: 8px; }
    6. Panels
    ========================================================================== */
 
-:is(.queue, .people, .alerts, .know, .insights, .my-reports, .setup, .map-panel, .report-hub) { display: flex; flex-direction: column; gap: 16px; }
+:is(.queue, .people, .alerts, .know, .insights, .my-reports, .setup, .map-panel, .report-hub, .dashboard) { display: flex; flex-direction: column; gap: 16px; }
 .panel-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 
 /* --- Reporting: Feel, Report, Get Help, Suggestion ----------------------------- */
@@ -420,6 +420,41 @@ details.disclosure > :not(summary) { margin-top: 8px; }
 /* --- Queue ------------------------------------------------------------------------ */
 .queue-section.is-empty { padding-top: 14px; padding-bottom: 14px; }
 .queue-section.is-empty .card-head { margin-bottom: 0; }
+
+/* --- Dashboard ------------------------------------------------------------------------ */
+.table-scroll { overflow-x: auto; margin: 0 -4px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.data-table th { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.data-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.data-table tbody tr:hover td { background: var(--surface-2); }
+.data-table .text-button { padding: 2px 0; font-family: var(--font-mono); font-size: 13px; white-space: nowrap; }
+.nowrap { white-space: nowrap; }
+
+/* --- Incident evaluation (top of Analytics) ---------------------------------------- */
+.evaluation-pick { flex: 0 1 340px; }
+.evaluation-body { display: flex; flex-direction: column; gap: 14px; }
+.eval-block { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.eval-block > h3, .eval-calc > h3, .eval-priority > h3 { margin: 0; font-size: 14px; font-weight: 700; }
+.eval-block > h3 { padding: 10px 14px; background: color-mix(in srgb, var(--link) 8%, var(--surface)); }
+.eval-details { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; }
+.eval-details div { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 14px; border-top: 1px solid var(--line); }
+.eval-details div:not(:nth-child(4n + 1)) { border-left: 1px solid var(--line); }
+.eval-details dt { font-size: 12px; color: var(--muted); }
+.eval-details dd { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.eval-details .chip { align-self: flex-start; }
+.eval-scores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 12px 14px 14px; }
+.eval-scores .field > span { font-size: 13px; font-weight: 600; color: var(--heading); }
+.eval-scores input { font-size: 18px; font-weight: 600; }
+.eval-result { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.eval-calc, .eval-priority { padding: 14px 16px; border-radius: 12px; }
+.eval-calc { background: color-mix(in srgb, var(--link) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--link) 22%, var(--surface)); }
+.eval-calc p { margin: 10px 0 0; font-family: var(--font-mono); font-size: 18px; }
+.eval-priority { background: color-mix(in srgb, var(--priority) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--priority) 45%, var(--surface)); }
+.eval-priority > h3 { color: var(--priority); }
+.eval-badge { display: inline-block; margin: 10px 0 8px; padding: 6px 22px; border-radius: 999px; background: var(--priority); color: #ffffff; font-size: 18px; font-weight: 700; }
+.eval-priority p { margin: 4px 0 0; font-size: 14px; color: var(--text); }
+.analytics-menu { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
 
 /* --- Analytics ------------------------------------------------------------------------ */
 .insight-list .section-title { margin-bottom: 4px; }
@@ -625,6 +660,11 @@ details.disclosure > :not(summary) { margin-top: 8px; }
   .category-button { min-height: 96px; }
   .report-hub > .segmented { display: flex; border-radius: 14px; }
   .report-hub > .segmented .filter-button { flex: 1 1 40%; border-radius: 11px; }
+  .eval-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .eval-details div:not(:nth-child(4n + 1)) { border-left: 0; }
+  .eval-details div:nth-child(2n) { border-left: 1px solid var(--line); }
+  .eval-scores, .eval-result { grid-template-columns: 1fr; }
+  .evaluation-pick { flex-basis: 100%; }
   .insight-card { grid-template-columns: 1fr; gap: 8px; }
   .insight-card .action-small { justify-self: start; }
   .weather-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }

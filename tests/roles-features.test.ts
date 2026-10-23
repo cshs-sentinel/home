@@ -44,11 +44,11 @@ test('a person without a position gets the role defaults', () => {
   assert.ok(!effectiveFeatures('school_admin', null).has('setup.locations'));
 });
 
-test('navigation: community sees Report and Alerts, School Admin gets Map and Analytics first', () => {
+test('navigation: community sees Report and Alerts, School Admin gets Dashboard, Map and Analytics first', () => {
   const community = navFor(effectiveFeatures('community', null));
   assert.deepEqual([...community].sort(), ['alerts', 'report']);
   const admin = navFor(effectiveFeatures('school_admin', null));
-  assert.deepEqual(admin.slice(0, 2), ['map', 'analytics']);
+  assert.deepEqual(admin.slice(0, 3), ['dashboard', 'map', 'analytics']);
   assert.ok(admin.includes('queue') && admin.includes('people'));
   const system = navFor(effectiveFeatures('system_admin', null));
   assert.ok(system.includes('setup') && system.includes('people'));

@@ -86,6 +86,8 @@ export type Incident = {
   status: IncidentStatus;
   location_id: string | null;
   created_by: string;
+  // the responder who took it ("Assign to me"); not every query selects it
+  assigned_to?: string | null;
   created_at: string;
   acknowledged_at: string | null;
   resolved_at: string | null;

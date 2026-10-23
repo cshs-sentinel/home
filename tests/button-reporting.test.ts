@@ -27,7 +27,7 @@ test('each community tab follows the position features', () => {
 
 test('School Admins and System Admins keep their own layout, not the community tabs', () => {
   const sa = navFor(effectiveFeatures('school_admin', null));
-  assert.deepEqual(sa, ['map', 'analytics', 'queue', 'alerts', 'report', 'people']);
+  assert.deepEqual(sa, ['dashboard', 'map', 'analytics', 'queue', 'alerts', 'report', 'people']);
   assert.ok(!sa.some((t) => ['feel', 'incident', 'help', 'know', 'mine'].includes(t)));
 });
 

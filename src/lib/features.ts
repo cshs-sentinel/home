@@ -38,7 +38,7 @@ export const FEATURE_GROUPS: { title: string; features: { key: Feature; label: s
     title: 'Menus',
     features: [
       { key: 'alerts.view', label: 'Alerts', hint: 'Weather and published alerts' },
-      { key: 'insights.view', label: 'Map and Analytics', hint: 'Decision cards, KPIs, and charts' },
+      { key: 'insights.view', label: 'Dashboard, Map and Analytics', hint: 'Incident evaluation, decision cards, KPIs, and charts' },
       { key: 'queue.view', label: 'Queue', hint: 'Help requests, incidents, and reports to handle' },
       { key: 'alerts.draft', label: 'Draft alerts', hint: 'Write alerts for approval' },
       { key: 'alerts.approve', label: 'Approve alerts', hint: 'Approve, publish, and withdraw alerts' },
@@ -93,6 +93,7 @@ export function navFor(features: Set<Feature>, simplified = false): Tab[] {
   }
   type StaffTab = Exclude<Tab, 'feel' | 'incident' | 'help' | 'know' | 'mine'>;
   const available: Record<StaffTab, boolean> = {
+    dashboard: has('insights.view'),
     map: has('insights.view'),
     analytics: has('insights.view'),
     queue: has('queue.view'),
@@ -101,9 +102,9 @@ export function navFor(features: Set<Feature>, simplified = false): Tab[] {
     people: has('people.manage'),
     setup: has('setup.locations') || has('setup.user_types'),
   };
-  // Insight roles start on the Map; others start on whatever they manage.
-  const order: StaffTab[] = available.map
-    ? ['map', 'analytics', 'queue', 'alerts', 'report', 'people', 'setup']
+  // Insight roles start on the Dashboard; others start on whatever they manage.
+  const order: StaffTab[] = available.dashboard
+    ? ['dashboard', 'map', 'analytics', 'queue', 'alerts', 'report', 'people', 'setup']
     : ['setup', 'people', 'report', 'alerts', 'queue'];
   return order.filter((t) => available[t]);
 }

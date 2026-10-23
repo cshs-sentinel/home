@@ -11,6 +11,7 @@ import { incidentSummary, since, type AlertTemplate } from './lib/analytics';
 import { ReportHub } from './components/ReportHub';
 import { AnalyticsPanel, RangeFilter, type Range } from './components/AnalyticsPanel';
 import { MapPanel } from './components/MapPanel';
+import { DashboardPanel } from './components/DashboardPanel';
 import { QueuePanel } from './components/QueuePanel';
 import { AlertsPanel } from './components/AlertsPanel';
 import { PeoplePanel } from './components/PeoplePanel';
@@ -210,7 +211,13 @@ function Workspace({ profile, schoolName, email, userType, onProfileChanged, the
   const external = useExternalData();
   const latestAlert = data.alerts.find((a) => a.status === 'published' && a.severity !== 'info');
   const queueUrgent = useMemo(() => urgentCount(profile.role, data), [profile.role, data]);
-  const showRange = tab === 'map' || tab === 'analytics';
+  const showRange = tab === 'dashboard' || tab === 'map' || tab === 'analytics';
+  // The incident open in Analytics › Incident Evaluation (the Dashboard's ID links set it).
+  const [evaluateId, setEvaluateId] = useState<string | null>(null);
+  function evaluate(id: string) {
+    setEvaluateId(id);
+    go('analytics');
+  }
 
   function draftFromInsight(t: AlertTemplate) {
     setTemplate(t);
@@ -287,9 +294,10 @@ function Workspace({ profile, schoolName, email, userType, onProfileChanged, the
             {tab === 'know' && tabs.includes('know') && <KnowPanel profile={profile} features={features} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} onChanged={reload} />}
             {tab === 'mine' && tabs.includes('mine') && <MyReportsPanel profile={profile} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onChanged={refresh} onProfileChanged={onProfileChanged} />}
             {tab === 'report' && tabs.includes('report') && <ReportHub profile={profile} features={features} locations={data.locations} onSent={refresh} />}
+            {tab === 'dashboard' && tabs.includes('dashboard') && <DashboardPanel days={days} data={data} onEvaluate={evaluate} />}
             {tab === 'map' && tabs.includes('map') && <MapPanel role={profile.role} days={days} data={data} />}
             {tab === 'analytics' && tabs.includes('analytics') && (
-              <AnalyticsPanel role={profile.role} days={days} data={data} weather={external.weather} quakes={external.quakes} onDraftAlert={draftFromInsight} />
+              <AnalyticsPanel role={profile.role} days={days} data={data} weather={external.weather} quakes={external.quakes} evaluateId={evaluateId} onEvaluate={setEvaluateId} onChanged={reload} onDraftAlert={draftFromInsight} />
             )}
             {tab === 'queue' && tabs.includes('queue') && <QueuePanel data={data} onChanged={reload} />}
             {tab === 'alerts' && tabs.includes('alerts') && <AlertsPanel profile={profile} features={features} data={data} initialTemplate={template} onChanged={reload} />}

@@ -8,7 +8,7 @@ export type Role = 'system_admin' | 'school_admin' | 'community';
 // feel, incident, help, know, and mine are the Community Member tabs: Tell Us How
 // You Feel, Report an Incident, Get Help, Things You Need to Know Now, and My
 // Reports (secondary). Other roles keep the single Report tab.
-export type Tab = 'report' | 'feel' | 'incident' | 'help' | 'know' | 'mine' | 'map' | 'analytics' | 'queue' | 'alerts' | 'people' | 'setup';
+export type Tab = 'report' | 'feel' | 'incident' | 'help' | 'know' | 'mine' | 'dashboard' | 'map' | 'analytics' | 'queue' | 'alerts' | 'people' | 'setup';
 
 export const ROLE_ORDER: Role[] = ['community', 'school_admin', 'system_admin'];
 
@@ -21,8 +21,9 @@ export const TAB_LABELS: Record<Tab, { label: string; title: string; icon: strin
   help: { label: 'Get Help', title: 'Get Help', icon: '🆘' },
   know: { label: 'Updates', title: 'Things You Need to Know Now', icon: 'ℹ️' },
   mine: { label: 'My Reports', title: 'My Reports', icon: '📋' },
+  dashboard: { label: 'Dashboard', title: 'Dashboard', icon: '▦' },
   map: { label: 'Map', title: 'Map', icon: '🗺' },
-  analytics: { label: 'Analytics', title: 'Analytics', icon: '◔' },
+  analytics: { label: 'Analytics', title: 'Incident Evaluation and Priority', icon: '◔' },
   queue: { label: 'Queue', title: 'Queue', icon: '☰' },
   alerts: { label: 'Alerts', title: 'Alerts', icon: '📣' },
   people: { label: 'People', title: 'People', icon: '👥' },

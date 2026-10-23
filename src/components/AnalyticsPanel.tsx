@@ -4,6 +4,7 @@ import type { SchoolData } from '../lib/data';
 import type { Quake, WeatherSnapshot } from '../lib/weather';
 import type { Role } from '../roles';
 import { BarList, ChartCard, ColumnChart, LineChart, StatTile, StatusChip } from './Charts';
+import { IncidentEvaluation } from './IncidentEvaluation';
 import { shortDay } from './WeatherPanel';
 
 export const RANGES = [7, 14, 30] as const;
@@ -21,7 +22,7 @@ export function RangeFilter({ days, onDays }: { days: Range; onDays: (d: Range) 
   );
 }
 
-type View = 'operations' | 'wellbeing';
+type View = 'attention' | 'operations' | 'wellbeing';
 
 type Props = {
   role: Role;
@@ -29,14 +30,17 @@ type Props = {
   data: SchoolData;
   weather: WeatherSnapshot | null;
   quakes: Quake[];
+  evaluateId: string | null;
+  onEvaluate: (id: string) => void;
+  onChanged: () => Promise<void>;
   onDraftAlert: (template: AlertTemplate) => void;
 };
 
-// What needs attention first, then one view at a time: operations (incidents,
-// help, reports) or wellbeing (feelings). The period is chosen in the top bar,
-// and the map covers "where".
-export function AnalyticsPanel({ role, days, data, weather, quakes, onDraftAlert }: Props) {
-  const [view, setView] = useState<View>('operations');
+// Incident evaluation first. Below it, one menu opens one section at a time:
+// what needs attention, operations (incidents, help, reports), or wellbeing
+// (feelings). The period is chosen in the top bar, and the map covers "where".
+export function AnalyticsPanel({ role, days, data, weather, quakes, evaluateId, onEvaluate, onChanged, onDraftAlert }: Props) {
+  const [view, setView] = useState<View>('attention');
   const [showTables, setShowTables] = useState(false);
   const insights = useMemo(
     () => generateInsights({ role, weather, quakes, submissions: data.submissions, incidents: data.incidents, checkIns: data.checkIns, locations: data.placeNames }),
@@ -47,37 +51,45 @@ export function AnalyticsPanel({ role, days, data, weather, quakes, onDraftAlert
   const reports = submissions.filter((s) => s.kind !== 'sentiment');
   const sentiments = submissions.filter((s) => s.kind === 'sentiment');
   const incidents = since(data.incidents, days, (i) => i.created_at).filter((i) => i.status !== 'cancelled');
+  const menu: { key: View; label: string }[] = [
+    { key: 'attention', label: `Needs attention${insights.length ? ` (${insights.length})` : ''}` },
+    { key: 'operations', label: 'Operations' },
+    { key: 'wellbeing', label: 'Wellbeing' },
+  ];
 
   return (
     <div className="insights">
-      {insights.length > 0 && (
-        <section className="card insight-list" aria-label="What needs attention">
-          <h2 className="section-title">What needs attention</h2>
-          {insights.map((insight) => (
-            <InsightCard key={insight.id} insight={insight} onDraftAlert={onDraftAlert} />
-          ))}
-        </section>
-      )}
+      <IncidentEvaluation data={data} selectedId={evaluateId} onSelect={onEvaluate} onChanged={onChanged} />
 
-      <div className="panel-toolbar">
-        <div className="segmented" role="group" aria-label="Analytics view">
-          <button type="button" className={`filter-button${view === 'operations' ? ' is-active' : ''}`} aria-pressed={view === 'operations'} onClick={() => setView('operations')}>
-            Operations
-          </button>
-          <button type="button" className={`filter-button${view === 'wellbeing' ? ' is-active' : ''}`} aria-pressed={view === 'wellbeing'} onClick={() => setView('wellbeing')}>
-            Wellbeing
-          </button>
+      <section className="analytics-menu" aria-label="Analytics sections">
+        <div className="panel-toolbar">
+          <div className="segmented" role="tablist" aria-label="Analytics sections">
+            {menu.map((m) => (
+              <button type="button" role="tab" key={m.key} aria-selected={view === m.key} className={`filter-button${view === m.key ? ' is-active' : ''}`} onClick={() => setView(m.key)}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {view !== 'attention' && (
+            <label className="check-row">
+              <input type="checkbox" checked={showTables} onChange={(e) => setShowTables(e.target.checked)} /> Show data tables
+            </label>
+          )}
         </div>
-        <label className="check-row">
-          <input type="checkbox" checked={showTables} onChange={(e) => setShowTables(e.target.checked)} /> Show data tables
-        </label>
-      </div>
 
-      {view === 'operations' ? (
-        <OperationsView reports={reports} incidents={incidents} days={days} data={data} showTables={showTables} />
-      ) : (
-        <WellbeingView sentiments={sentiments} days={days} showTables={showTables} />
-      )}
+        {view === 'attention' &&
+          (insights.length > 0 ? (
+            <section className="card insight-list">
+              {insights.map((insight) => (
+                <InsightCard key={insight.id} insight={insight} onDraftAlert={onDraftAlert} />
+              ))}
+            </section>
+          ) : (
+            <p className="card empty-note">Nothing needs attention right now.</p>
+          ))}
+        {view === 'operations' && <OperationsView reports={reports} incidents={incidents} days={days} data={data} showTables={showTables} />}
+        {view === 'wellbeing' && <WellbeingView sentiments={sentiments} days={days} showTables={showTables} />}
+      </section>
     </div>
   );
 }
@@ -127,7 +139,6 @@ function WellbeingView({ sentiments, days, showTables }: { sentiments: SchoolDat
 function OperationsView({ reports, incidents, days, data, showTables }: { reports: SchoolData['submissions']; incidents: SchoolData['incidents']; days: number; data: SchoolData; showTables: boolean }) {
   const summary = incidentSummary(data.incidents);
   const helpToday = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help' && c.triage_status !== 'resolved').length;
-  const byCategory = countBy(incidents, (i) => i.category);
   const byType = countBy(reports, (s) => s.sub_type);
   const daily = dailyCount([...reports.map((r) => r.created_at), ...incidents.map((i) => i.created_at)], days, (d) => d);
 
@@ -142,9 +153,6 @@ function OperationsView({ reports, incidents, days, data, showTables }: { report
       <div className="chart-grid">
         <ChartCard title="Reports and incidents per day" showTable={showTables} table={{ columns: ['Day', 'Count'], rows: daily.map((d) => [d.date, d.n]) }}>
           <ColumnChart data={daily.map((d) => ({ label: shortDay(d.date), value: d.n }))} />
-        </ChartCard>
-        <ChartCard title="Incidents by category" showTable={showTables} table={{ columns: ['Category', 'Count'], rows: byCategory.map((c) => [c.label, c.count]) }}>
-          <BarList data={byCategory} empty="No incidents in this period." />
         </ChartCard>
         <ChartCard title="Concerns and suggestions" showTable={showTables} table={{ columns: ['Type', 'Count'], rows: byType.map((c) => [c.label, c.count]) }}>
           <BarList data={byType} empty="None in this period." />

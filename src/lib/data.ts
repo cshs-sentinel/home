@@ -51,7 +51,7 @@ export function useSchoolData(profile: Profile) {
         : Promise.resolve({ data: [], error: null }),
       supabase
         .from('incidents')
-        .select('id, case_ref, category, description, status, location_id, created_by, created_at, acknowledged_at, resolved_at, priority_severity, priority_urgency, priority_affected, priority_index, priority_level, priority_set_by')
+        .select('id, case_ref, category, description, status, location_id, created_by, assigned_to, created_at, acknowledged_at, resolved_at, priority_severity, priority_urgency, priority_affected, priority_index, priority_level, priority_set_by')
         .gte('created_at', sinceIso)
         .order('created_at', { ascending: false })
         .limit(1000),

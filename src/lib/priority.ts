@@ -5,11 +5,11 @@
 
 export type PriorityLevel = 'low' | 'moderate' | 'high' | 'critical';
 
-export const PRIORITY_LEVELS: Record<PriorityLevel, { label: string; range: string; color: string }> = {
-  low: { label: 'Low', range: '3–5', color: '#16A34A' },
-  moderate: { label: 'Moderate', range: '6–8', color: '#2563EB' },
-  high: { label: 'High', range: '9–11', color: '#EA580C' },
-  critical: { label: 'Critical', range: '12', color: '#DC2626' },
+export const PRIORITY_LEVELS: Record<PriorityLevel, { label: string; range: string; color: string; action: string }> = {
+  low: { label: 'Low', range: '3–5', color: '#16A34A', action: 'Handle during regular routines.' },
+  moderate: { label: 'Moderate', range: '6–8', color: '#2563EB', action: 'Respond within the day and monitor.' },
+  high: { label: 'High', range: '9–11', color: '#EA580C', action: 'Requires immediate attention and coordinated response.' },
+  critical: { label: 'Critical', range: '12', color: '#DC2626', action: 'Activate the emergency response now.' },
 };
 
 export function classifyPriority(total: number): PriorityLevel {
