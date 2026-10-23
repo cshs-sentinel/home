@@ -641,3 +641,52 @@ header {
   .map-controls .control-label { min-width: 0; width: 100%; }
   .segmented .filter-button { padding: 4px 10px; }
 }
+
+/* --- Button-based reporting (Community Member tabs) --------------------------- */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.quick-report { max-width: 760px; }
+.quick-report .flow-question { margin-top: 12px; }
+.category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 16px; }
+.category-button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 104px; padding: 14px 10px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-weight: 600; text-align: center; line-height: 1.25; }
+.category-button:hover:not(:disabled) { transform: scale(1.03); }
+.category-button:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+.category-button:disabled { opacity: .55; cursor: default; }
+.category-button.tone-warn { border-color: color-mix(in srgb, var(--sev-serious) 45%, var(--border)); }
+.category-button.tone-danger { border-color: color-mix(in srgb, var(--sev-critical) 45%, var(--border)); }
+.category-icon { font-size: 30px; line-height: 1; }
+.feel-comment { margin-top: 14px; }
+.feel-comment textarea { resize: vertical; }
+.safe-row { margin-top: 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.done-card .big-button + .big-button { margin-top: 10px; }
+
+.confirm-dialog { width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 26px 24px 22px; border: 1px solid var(--border-strong); border-radius: 16px; background: var(--surface); color: var(--text); box-shadow: var(--card-shadow); overflow: auto; }
+.confirm-dialog::backdrop { background: rgba(10, 20, 30, .55); }
+.confirm-category { font-family: var(--font-display); font-size: 26px; letter-spacing: -.015em; margin: 0 0 18px; color: var(--heading); }
+.confirm-dialog .field { margin-top: 4px; }
+.confirm-dialog .role-select { width: 100%; min-height: 48px; }
+.confirm-dialog .fine-print { margin-top: 8px; }
+.confirm-more { margin-top: 14px; }
+.confirm-more summary { cursor: pointer; color: var(--link); font-weight: 600; font-size: 14px; padding: 6px 0; }
+.confirm-more textarea { width: 100%; }
+.confirm-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.confirm-actions .big-button { margin-top: 0; }
+
+.reminder-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; line-height: 1.5; color: var(--muted); }
+.procedure-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.procedure { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 4px 14px; }
+.procedure summary { cursor: pointer; font-weight: 700; padding: 12px 0; }
+.procedure ol { margin: 0 0 12px; padding-left: 22px; line-height: 1.55; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+.know > section { margin-top: 8px; }
+
+.chip.status-pending_evaluation { background: color-mix(in srgb, var(--sev-warning) 24%, var(--surface)); color: var(--text); }
+.chip.triage-urgent { background: color-mix(in srgb, var(--sev-critical) 20%, var(--surface)); color: var(--text); font-weight: 700; }
+.chip.triage-awaiting_triage { background: color-mix(in srgb, var(--sev-warning) 24%, var(--surface)); color: var(--text); }
+.chip.triage-responding { background: color-mix(in srgb, var(--sev-info) 20%, var(--surface)); color: var(--text); }
+.chip.triage-resolved { background: color-mix(in srgb, var(--sev-good) 20%, var(--surface)); color: var(--text); }
+.priority-auto { font-weight: 400; opacity: .8; }
+
+@media (max-width: 740px) {
+  .category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .category-button { min-height: 92px; }
+  .confirm-dialog { padding: 22px 18px 18px; }
+}

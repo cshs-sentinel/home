@@ -31,8 +31,9 @@ export function useSchoolData(profile: Profile) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const reload = useCallback(async () => {
-    setLoading(true);
+  // `silent` refreshes in place (used by realtime) without dimming the panel.
+  const reload = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError('');
     const sinceIso = new Date(Date.now() - HISTORY_DAYS * 24 * 3600_000).toISOString();
     const readsSubmissions = READS_SUBMISSIONS.includes(profile.role);
@@ -50,13 +51,13 @@ export function useSchoolData(profile: Profile) {
         : Promise.resolve({ data: [], error: null }),
       supabase
         .from('incidents')
-        .select('id, case_ref, category, description, status, location_id, created_by, created_at, acknowledged_at, resolved_at, priority_severity, priority_urgency, priority_affected, priority_index, priority_level')
+        .select('id, case_ref, category, description, status, location_id, created_by, created_at, acknowledged_at, resolved_at, priority_severity, priority_urgency, priority_affected, priority_index, priority_level, priority_set_by')
         .gte('created_at', sinceIso)
         .order('created_at', { ascending: false })
         .limit(1000),
       supabase
         .from('check_ins')
-        .select('id, profile_id, status, location_id, checked_in_at')
+        .select('id, profile_id, status, location_id, checked_in_at, help_type, triage_status')
         .gte('checked_in_at', sinceIso)
         .order('checked_in_at', { ascending: false })
         .limit(2000),
@@ -103,6 +104,31 @@ export function useSchoolData(profile: Profile) {
   return { data, loading, error, reload };
 }
 
+// Reports appear on the map and in the queue the moment they are saved: refresh
+// whenever an incident, help request, or submission this account may read changes.
+// Row-level security applies to realtime too, so people only hear about rows they
+// could already read. Bursts are merged into one refresh.
+export function useRealtimeReload(reload: (silent?: boolean) => Promise<void>, enabled = true) {
+  useEffect(() => {
+    if (!enabled) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => void reload(true), 400);
+    };
+    const channel = supabase
+      .channel('reports-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'check_ins' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, refresh)
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [reload, enabled]);
+}
+
 export function useExternalData() {
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
   const [quakes, setQuakes] = useState<Quake[]>([]);
@@ -145,6 +171,9 @@ function toResult(error: { message: string } | null): Result {
 
 function friendlyError(message: string): string {
   if (message.includes('already have an open incident')) return 'You already reported an incident a few minutes ago. Responders have it. Please wait before sending another.';
+  if (message.includes('already asked for help')) return 'You already asked for help a moment ago. Responders have it. If it is urgent, tell the nearest teacher or staff member.';
+  if (message.includes('choose where')) return 'Choose where this is before you confirm.';
+  if (message.includes('not active')) return 'That place is not available any more. Choose another place.';
   if (message.includes('row-level security')) return 'Your role is not allowed to do that.';
   if (message.includes('Database error saving new user')) return 'Registration was refused. Check your name, position, and default location, then try again.';
   if (message.includes('user_types_school_name_key')) return 'A position with that name already exists.';
@@ -176,10 +205,19 @@ export async function raiseIncident(profile: Profile, input: { category: string;
   return { ...toResult(error), caseRef: data?.case_ref };
 }
 
-export async function checkIn(profile: Profile, status: 'safe' | 'need_help', locationId: string | null): Promise<Result> {
-  const { error } = await supabase
+// `helpType` is one of the Get Help buttons. The database picks the first triage
+// status from it; the browser never sends one.
+export async function checkIn(profile: Profile, status: 'safe' | 'need_help', locationId: string | null, helpType?: string): Promise<Result & { triage?: string }> {
+  const { data, error } = await supabase
     .from('check_ins')
-    .insert({ school_id: profile.school_id, status, location_id: locationId, location_source: 'self_selected' });
+    .insert({ school_id: profile.school_id, status, location_id: locationId, location_source: 'self_selected', ...(helpType ? { help_type: helpType } : {}) })
+    .select('triage_status')
+    .single();
+  return { ...toResult(error), triage: data?.triage_status ?? undefined };
+}
+
+export async function triageHelp(id: string, status: 'responding' | 'resolved'): Promise<Result> {
+  const { error } = await supabase.rpc('triage_help_request', { p_check_in_id: id, p_status: status });
   return toResult(error);
 }
 

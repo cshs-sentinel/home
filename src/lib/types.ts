@@ -75,12 +75,13 @@ export type Submission = {
   resolved_at: string | null;
 };
 
-export type IncidentStatus = 'new' | 'acknowledged' | 'assigned' | 'in_progress' | 'resolved' | 'closed' | 'cancelled';
+export type IncidentStatus = 'pending_evaluation' | 'new' | 'acknowledged' | 'assigned' | 'in_progress' | 'resolved' | 'closed' | 'cancelled';
 
 export type Incident = {
   id: string;
   case_ref: string;
-  category: 'emergency' | 'medical' | 'security' | 'other';
+  // one of the values in lib/catalog (INCIDENT_CATEGORIES or the four older ones)
+  category: string;
   description: string;
   status: IncidentStatus;
   location_id: string | null;
@@ -93,7 +94,11 @@ export type Incident = {
   priority_affected: number | null;
   priority_index: number | null;
   priority_level: 'low' | 'moderate' | 'high' | 'critical' | null;
+  // null while the factors are still the system defaults for the category
+  priority_set_by: string | null;
 };
+
+export type TriageStatus = 'urgent' | 'awaiting_triage' | 'responding' | 'resolved';
 
 export type CheckIn = {
   id: string;
@@ -101,6 +106,8 @@ export type CheckIn = {
   status: 'safe' | 'need_help';
   location_id: string | null;
   checked_in_at: string;
+  help_type: string | null;
+  triage_status: TriageStatus | null;
 };
 
 export type AlertStatus = 'draft' | 'approved' | 'published' | 'corrected' | 'cancelled';

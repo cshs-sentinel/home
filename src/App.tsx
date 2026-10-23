@@ -6,7 +6,7 @@ import demoAccounts from './demo-accounts.json';
 import { THEME_LABELS, useTheme } from './theme';
 import { SignUpCard } from './components/SignUpCard';
 import type { Profile, UserType } from './lib/types';
-import { USER_TYPE_COLUMNS, useExternalData, useSchoolData, type SchoolData } from './lib/data';
+import { USER_TYPE_COLUMNS, useExternalData, useRealtimeReload, useSchoolData, type SchoolData } from './lib/data';
 import { incidentSummary, since, type AlertTemplate } from './lib/analytics';
 import { ReportPanel } from './components/ReportPanel';
 import { AnalyticsPanel, type Range } from './components/AnalyticsPanel';
@@ -16,6 +16,10 @@ import { QueuePanel } from './components/QueuePanel';
 import { AlertsPanel } from './components/AlertsPanel';
 import { PeoplePanel } from './components/PeoplePanel';
 import { MyLocationApprovals } from './components/MyLocationApprovals';
+import { FeelPanel } from './components/FeelPanel';
+import { QuickReport } from './components/QuickReport';
+import { KnowPanel } from './components/KnowPanel';
+import { MyReportsPanel } from './components/MyReportsPanel';
 import { SetupPanel } from './components/SetupPanel';
 import { effectiveFeatures, navFor } from './lib/features';
 
@@ -173,7 +177,10 @@ function PendingApprovalCard({ status }: { status: 'pending' | 'rejected' }) {
 function Workspace({ profile, schoolName, email, userType, onProfileChanged }: { profile: Profile; schoolName: string | null; email: string; userType: UserType | null; onProfileChanged: () => Promise<void> }) {
   const details = roleDetails[profile.role];
   const features = useMemo(() => effectiveFeatures(profile.role, userType?.features ?? null), [profile.role, userType]);
-  const nav = navFor(features);
+  // Community Members (and Classroom Advisers, who are Community Members) get the
+  // four big-button tabs; School Admins and System Admins keep their own layout.
+  const simplified = profile.role === 'community';
+  const nav = navFor(features, simplified);
   // A Classroom Adviser (or any Community Member position with
   // can_approve_own_location) gets the People tab too, scoped to just their
   // own location's pending approvals -- otherwise community accounts never
@@ -187,6 +194,20 @@ function Workspace({ profile, schoolName, email, userType, onProfileChanged }: {
   const [days, setDays] = useState<Range>(14);
   const [template, setTemplate] = useState<AlertTemplate | null>(null);
   const { data, loading, error, reload } = useSchoolData(profile);
+  // The map, queue, and My Reports refresh the moment a report is saved.
+  useRealtimeReload(reload);
+  const refresh = useCallback(() => {
+    void reload(true);
+  }, [reload]);
+  // "Need Support" and "Unsafe" can jump to a category with its dialog already open.
+  const [preset, setPreset] = useState<{ tab: Tab; value: string } | null>(null);
+  const clearPreset = useCallback(() => setPreset(null), []);
+  function go(next: Tab, category?: string) {
+    setPreset(category ? { tab: next, value: category } : null);
+    setTab(next);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  const alertsTab: Tab = tabs.includes('know') ? 'know' : 'alerts';
   const external = useExternalData();
   const latestAlert = data.alerts.find((a) => a.status === 'published' && a.severity !== 'info');
   const queueUrgent = useMemo(() => urgentCount(profile.role, data), [profile.role, data]);
@@ -211,8 +232,8 @@ function Workspace({ profile, schoolName, email, userType, onProfileChanged }: {
         </div>
       </div>
 
-      {latestAlert && tabs.includes('alerts') && (
-        <button type="button" className={`alert-banner sev-${latestAlert.severity}`} onClick={() => setTab('alerts')}>
+      {latestAlert && tabs.includes(alertsTab) && (
+        <button type="button" className={`alert-banner sev-${latestAlert.severity}`} onClick={() => setTab(alertsTab)}>
           <span aria-hidden="true">{latestAlert.severity === 'urgent' ? '🚨' : '⚠️'}</span>
           <span>
             <strong>{latestAlert.title}</strong>
@@ -238,6 +259,15 @@ function Workspace({ profile, schoolName, email, userType, onProfileChanged }: {
 
       {error && <p className="error-text">Some data could not load: {error}</p>}
       <div className={`panel${loading ? ' is-loading' : ''}`}>
+        {tab === 'feel' && tabs.includes('feel') && <FeelPanel profile={profile} locations={data.locations} onSent={refresh} onGo={go} />}
+        {tab === 'incident' && tabs.includes('incident') && (
+          <QuickReport kind="incident" profile={profile} locations={data.locations} preset={preset?.tab === 'incident' ? preset.value : null} onPresetUsed={clearPreset} showSafe={false} onSent={refresh} onSeeReports={() => go('mine')} />
+        )}
+        {tab === 'help' && tabs.includes('help') && (
+          <QuickReport kind="help" profile={profile} locations={data.locations} preset={preset?.tab === 'help' ? preset.value : null} onPresetUsed={clearPreset} showSafe={features.has('report.safe')} onSent={refresh} onSeeReports={() => go('mine')} />
+        )}
+        {tab === 'know' && tabs.includes('know') && <KnowPanel profile={profile} features={features} data={data} weather={external.weather} quakes={external.quakes} weatherError={external.error} onChanged={reload} />}
+        {tab === 'mine' && tabs.includes('mine') && <MyReportsPanel profile={profile} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onChanged={refresh} onProfileChanged={onProfileChanged} />}
         {tab === 'report' && tabs.includes('report') && <ReportPanel profile={profile} features={features} locations={data.locations} incidents={data.incidents} checkIns={data.checkIns} onSent={reload} onProfileChanged={onProfileChanged} />}
         {tab === 'map' && tabs.includes('map') && <MapPanel role={profile.role} days={days} onDays={setDays} data={data} />}
         {tab === 'analytics' && tabs.includes('analytics') && (
@@ -258,7 +288,7 @@ function Workspace({ profile, schoolName, email, userType, onProfileChanged }: {
 // unacknowledged incidents for School Admins.
 function urgentCount(role: Role, data: SchoolData): number {
   if (role === 'school_admin') {
-    const help = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help').length;
+    const help = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help' && c.triage_status !== 'resolved').length;
     return help + incidentSummary(data.incidents).unacknowledged;
   }
   return 0;

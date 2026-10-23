@@ -1,12 +1,13 @@
 import { useState, type CSSProperties } from 'react';
-import { CRISIS_EMOTIONS, iconFor, labelFor } from '../lib/catalog';
-import { reviewSubmission, setIncidentPriority, transitionIncident, type SchoolData } from '../lib/data';
+import { CRISIS_EMOTIONS, TRIAGE_LABELS, iconFor, labelFor } from '../lib/catalog';
+import { reviewSubmission, setIncidentPriority, transitionIncident, triageHelp, type SchoolData } from '../lib/data';
 import { PRIORITY_FACTORS, PRIORITY_LEVELS, classifyPriority, type PriorityLevel } from '../lib/priority';
 import { locationName, OPEN_INCIDENT, since } from '../lib/analytics';
-import type { Incident, IncidentStatus, Submission } from '../lib/types';
+import type { CheckIn, Incident, IncidentStatus, Submission } from '../lib/types';
 import { StatusChip } from './Charts';
 
 const NEXT_STEP: Partial<Record<IncidentStatus, { to: IncidentStatus; label: string }>> = {
+  pending_evaluation: { to: 'acknowledged', label: 'Validate' },
   new: { to: 'acknowledged', label: 'Acknowledge' },
   acknowledged: { to: 'assigned', label: 'Take it' },
   assigned: { to: 'in_progress', label: 'Start' },
@@ -27,8 +28,11 @@ export function QueuePanel({ data, onChanged }: { data: SchoolData; onChanged: (
     setBusy(null);
   }
 
-  const help = since(data.checkIns, 1, (c) => c.checked_in_at).filter((c) => c.status === 'need_help');
+  const help = since(data.checkIns, 1, (c) => c.checked_in_at)
+    .filter((c) => c.status === 'need_help' && c.triage_status !== 'resolved')
+    .sort((a, b) => Number(b.triage_status === 'urgent') - Number(a.triage_status === 'urgent') || b.checked_in_at.localeCompare(a.checked_in_at));
   const activeIncidents = data.incidents.filter((i) => OPEN_INCIDENT.includes(i.status) || i.status === 'resolved').sort(byPriority);
+  const waiting = activeIncidents.filter((i) => i.status === 'pending_evaluation').length;
   const openSubmissions = data.submissions.filter((s) => s.status !== 'resolved');
   const followUps = openSubmissions.filter((s) => s.kind === 'sentiment').sort(urgencyFirst);
   const reports = openSubmissions.filter((s) => s.kind !== 'sentiment');
@@ -48,23 +52,14 @@ export function QueuePanel({ data, onChanged }: { data: SchoolData; onChanged: (
           ) : (
             <ul className="queue-list">
               {help.map((c) => (
-                <li key={c.id} className="queue-item urgent">
-                  <span className="queue-icon" aria-hidden="true">🆘</span>
-                  <div className="queue-main">
-                    <strong>Help requested</strong>
-                    <small>
-                      {locationName(data.locations, c.location_id)} · {timeAgo(c.checked_in_at)}
-                    </small>
-                  </div>
-                  <StatusChip severity="critical" />
-                </li>
+                <HelpRow key={c.id} help={c} place={locationName(data.locations, c.location_id)} busy={busy === c.id} onTriage={(to) => run(c.id, () => triageHelp(c.id, to))} />
               ))}
             </ul>
           )}
         </section>
 
       <section>
-          <h2 className="section-title">Incidents</h2>
+          <h2 className="section-title">Incidents{waiting > 0 ? ` · ${waiting} waiting for evaluation` : ''}</h2>
           {activeIncidents.length === 0 ? (
             <p className="empty-note">No open incidents.</p>
           ) : (
@@ -109,7 +104,7 @@ function IncidentRow({ incident, place, busy, canCancel, onMove, onPriority }: {
   const next = NEXT_STEP[incident.status];
   const [rating, setRating] = useState(false);
   return (
-    <li className={`queue-item${incident.status === 'new' ? ' urgent' : ''}`}>
+    <li className={`queue-item${incident.status === 'new' || incident.status === 'pending_evaluation' ? ' urgent' : ''}`}>
       <span className="queue-icon" aria-hidden="true">{iconFor(incident.category)}</span>
       <div className="queue-main">
         <strong>
@@ -119,8 +114,8 @@ function IncidentRow({ incident, place, busy, canCancel, onMove, onPriority }: {
           {place} · {timeAgo(incident.created_at)}
         </small>
       </div>
-      <PriorityChip level={incident.priority_level} index={incident.priority_index} />
-      <span className={`chip status-${incident.status}`}>{incident.status.replace('_', ' ')}</span>
+      <PriorityChip level={incident.priority_level} index={incident.priority_index} auto={incident.priority_set_by === null} />
+      <span className={`chip status-${incident.status}`}>{incident.status.replace(/_/g, ' ')}</span>
       <div className="queue-actions">
         {next && (
           <button type="button" className="action-small primary" disabled={busy} onClick={() => onMove(next.to, next.to === 'resolved' ? 'Resolved from queue' : undefined)}>
@@ -131,8 +126,8 @@ function IncidentRow({ incident, place, busy, canCancel, onMove, onPriority }: {
           {incident.priority_index === null ? 'Set priority' : 'Change priority'}
         </button>
         {canCancel && OPEN_INCIDENT.includes(incident.status) && (
-          <button type="button" className="action-small" disabled={busy} onClick={() => onMove('cancelled', 'Cancelled by School Admin')}>
-            Cancel
+          <button type="button" className="action-small" disabled={busy} onClick={() => onMove('cancelled', incident.status === 'pending_evaluation' ? 'Dismissed after evaluation' : 'Cancelled by School Admin')}>
+            {incident.status === 'pending_evaluation' ? 'Dismiss' : 'Cancel'}
           </button>
         )}
       </div>
@@ -151,14 +146,43 @@ function IncidentRow({ incident, place, busy, canCancel, onMove, onPriority }: {
   );
 }
 
-export function PriorityChip({ level, index }: { level: PriorityLevel | null; index: number | null }) {
+// `auto` marks the system default for the report's category: a responder has not
+// confirmed or changed it yet.
+export function PriorityChip({ level, index, auto = false }: { level: PriorityLevel | null; index: number | null; auto?: boolean }) {
   if (!level || index === null) return <span className="chip priority-chip is-unrated">Not rated</span>;
   const p = PRIORITY_LEVELS[level];
   return (
-    <span className="chip priority-chip" style={{ '--priority': p.color } as CSSProperties} title={`Priority Index ${index} of 12 · ${p.label} (${p.range})`}>
+    <span className="chip priority-chip" style={{ '--priority': p.color } as CSSProperties} title={`Priority Index ${index} of 12 · ${p.label} (${p.range})${auto ? ' · system default for this category, not yet confirmed' : ''}`}>
       <span className="priority-dot" aria-hidden="true" />
       {p.label} · {index}
+      {auto && <span className="priority-auto"> · default</span>}
     </span>
+  );
+}
+
+function HelpRow({ help, place, busy, onTriage }: { help: CheckIn; place: string; busy: boolean; onTriage: (to: 'responding' | 'resolved') => void }) {
+  const status = help.triage_status ?? 'awaiting_triage';
+  return (
+    <li className={`queue-item${status === 'urgent' ? ' urgent' : ''}`}>
+      <span className="queue-icon" aria-hidden="true">{iconFor(help.help_type ?? 'emergency_help')}</span>
+      <div className="queue-main">
+        <strong>{labelFor(help.help_type ?? 'emergency_help')}</strong>
+        <small>
+          {place} · {timeAgo(help.checked_in_at)}
+        </small>
+      </div>
+      <span className={`chip triage-${status}`}>{TRIAGE_LABELS[status]}</span>
+      <div className="queue-actions">
+        {status !== 'responding' && (
+          <button type="button" className="action-small primary" disabled={busy} onClick={() => onTriage('responding')}>
+            Respond
+          </button>
+        )}
+        <button type="button" className="action-small" disabled={busy} onClick={() => onTriage('resolved')}>
+          Resolve
+        </button>
+      </div>
+    </li>
   );
 }
 

@@ -79,9 +79,25 @@ export type Nav = { primary: Tab[]; more: Tab[] };
 
 // Insight roles get Map and Analytics up front and everything else under
 // More. Other roles keep a short, flat list of tabs.
-export function navFor(features: Set<Feature>): Nav {
+// `simplified` is the Community Member layout: four big-button tabs (feelings,
+// incidents, help, things to know) with My Reports behind More. Each tab still
+// follows the position's features, so a position without `report.help` has no
+// Get Help tab.
+export function navFor(features: Set<Feature>, simplified = false): Nav {
   const has = (f: Feature) => features.has(f);
-  const available: Record<Tab, boolean> = {
+  if (simplified) {
+    const open: Record<'feel' | 'incident' | 'help' | 'know' | 'mine', boolean> = {
+      feel: has('report.feeling'),
+      incident: has('report.incident') || has('report.hazard'),
+      help: has('report.help') || has('report.safe'),
+      know: has('alerts.view'),
+      mine: REPORT.some(has),
+    };
+    const primary = (['feel', 'incident', 'help', 'know'] as const).filter((t) => open[t]);
+    return { primary, more: open.mine ? ['mine'] : [] };
+  }
+  type StaffTab = Exclude<Tab, 'feel' | 'incident' | 'help' | 'know' | 'mine'>;
+  const available: Record<StaffTab, boolean> = {
     map: has('insights.view'),
     analytics: has('insights.view'),
     queue: has('queue.view'),
@@ -91,9 +107,9 @@ export function navFor(features: Set<Feature>): Nav {
     setup: has('setup.locations') || has('setup.user_types'),
   };
   if (available.map) {
-    const more: Tab[] = ['queue', 'alerts', 'report', 'people', 'setup'];
+    const more: StaffTab[] = ['queue', 'alerts', 'report', 'people', 'setup'];
     return { primary: ['map', 'analytics'], more: more.filter((t) => available[t]) };
   }
-  const order: Tab[] = ['setup', 'people', 'report', 'alerts', 'queue'];
+  const order: StaffTab[] = ['setup', 'people', 'report', 'alerts', 'queue'];
   return { primary: order.filter((t) => available[t]), more: [] };
 }

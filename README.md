@@ -63,11 +63,15 @@ node scripts/seed-sample-accounts.mjs
 The script is idempotent. It reads `src/demo-accounts.json`, marks accounts as admin-provisioned,
 re-syncs each account's position and role, and retires the emails listed under `retired`. It requires `SUPABASE_SERVICE_ROLE_KEY` in `.env`.
 
+Community Members report with buttons: tap a category, confirm the place, submit. See
+[docs/button-reporting.md](docs/button-reporting.md) for the four tabs, Pending Evaluation, the default
+Priority Index scores, and help triage.
+
 ## Tests
 
 ```bash
-npm test            # unit tests: roles, features, locations
-npm run test:db     # database acceptance tests; run in one transaction that always rolls back
+npm test            # unit tests: roles, features, locations, button reporting
+npm run test:db     # database acceptance tests (117 checks); each script runs in one transaction that always rolls back
 ```
 
 `test:db` needs `SUPABASE_URL` and `SUPABASE_ACCESS_TOKEN` in `.env`. Results are in

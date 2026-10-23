@@ -4,56 +4,6 @@
 -- raises an error carrying the results, so the transaction always rolls back.
 -- Run with:  npm run test:db
 
-create schema zz_test;
-grant usage on schema zz_test to public;
-create table zz_test.res (n serial primary key, name text, ok boolean, detail text);
-create table zz_test.fx (k text primary key, v text);
-grant all on all tables in schema zz_test to public;
-grant usage on all sequences in schema zz_test to public;
-
-create function zz_test.f(p_key text) returns text language sql as $f$ select v from zz_test.fx where k = p_key $f$;
-create function zz_test.rec(p_name text, p_ok boolean, p_detail text default '') returns void language plpgsql as $f$
-begin insert into zz_test.res (name, ok, detail) values (p_name, coalesce(p_ok, false), left(coalesce(p_detail, ''), 140)); end $f$;
-create function zz_test.try(p_sql text) returns text language plpgsql as $f$
-begin execute p_sql; return 'ok'; exception when others then return sqlerrm; end $f$;
-create function zz_test.val(p_sql text) returns text language plpgsql as $f$
-declare r text; begin execute p_sql into r; return coalesce(r, 'null'); exception when others then return 'ERR: ' || sqlerrm; end $f$;
--- Reads as the table owner, for checking what a Community Member cannot read themselves.
-create function zz_test.sval(p_sql text) returns text language plpgsql security definer as $f$
-declare r text; begin execute p_sql into r; return coalesce(r, 'null'); exception when others then return 'ERR: ' || sqlerrm; end $f$;
-create function zz_test.refused(p_result text, p_fragment text) returns boolean language sql as $f$
-select p_result <> 'ok' and p_result ilike '%' || p_fragment || '%' $f$;
-create function zz_test.uid(p_email text) returns uuid language sql security definer as $f$ select id from auth.users where email = p_email $f$;
-create function zz_test.use_id(p_id uuid) returns void language plpgsql as $f$
-begin
-  reset role;
-  perform set_config('request.jwt.claims', json_build_object('sub', p_id, 'role', 'authenticated')::text, true);
-  set local role authenticated;
-end $f$;
-create function zz_test.use(p_email text) returns void language plpgsql as $f$
-declare v_id uuid;
-begin
-  reset role;
-  select id into v_id from auth.users where email = p_email;
-  if v_id is null then raise exception 'no such test user %', p_email; end if;
-  perform zz_test.use_id(v_id);
-end $f$;
-create function zz_test.use_anon() returns void language plpgsql as $f$
-begin
-  reset role;
-  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
-  set local role anon;
-end $f$;
-create function zz_test.reg(p_email text, p_meta jsonb, p_app jsonb default '{}'::jsonb) returns text language plpgsql as $f$
-begin
-  insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, raw_app_meta_data, created_at, updated_at)
-  values (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', p_email, p_meta, p_app, now(), now());
-  return 'ok';
-exception when others then return sqlerrm; end $f$;
-create function zz_test.meta(p_designation text, p_location text) returns jsonb language sql as $f$
-select jsonb_build_object('display_name', 'Test Person', 'designation_id', zz_test.f(p_designation), 'default_location_id', zz_test.f(p_location)) $f$;
-grant execute on all functions in schema zz_test to public;
-
 -- Fixtures -------------------------------------------------------------------
 insert into zz_test.fx select 'school_a', id::text from public.schools where status = 'active' order by created_at limit 1;
 -- Four throwaway rooms under the school's first floor (rolled back with everything else).
@@ -70,6 +20,8 @@ insert into zz_test.fx select 'nonteaching', id::text from public.user_types whe
 insert into zz_test.fx select 'school_admin_t', id::text from public.user_types where name = 'School Admin' and school_id = zz_test.f('school_a')::uuid;
 insert into zz_test.fx select 'system_admin_t', id::text from public.user_types where name = 'System Admin' and school_id = zz_test.f('school_a')::uuid;
 update public.user_types set selectable_at_signup = true where id in (zz_test.f('student')::uuid, zz_test.f('teacher')::uuid);
+-- Sign-up is open by default now; this one position is closed so the 'not open' rule can be tested.
+update public.user_types set selectable_at_signup = false where id = zz_test.f('nonteaching')::uuid;
 
 insert into public.schools (name) values ('ZZ Test School B');
 insert into zz_test.fx select 'school_b', id::text from public.schools where name = 'ZZ Test School B';
@@ -118,8 +70,8 @@ select zz_test.rec('T08 registering as a System Admin position is refused',
   zz_test.refused(zz_test.reg('zz-four@test.invalid', zz_test.meta('system_admin_t', 'room1')), 'not open for registration'),
   zz_test.reg('zz-four2@test.invalid', zz_test.meta('system_admin_t', 'room1')));
 select zz_test.rec('T09 registration without a default location is refused',
-  zz_test.refused(zz_test.reg('zz-five@test.invalid', jsonb_build_object('display_name', 'No Place', 'designation_id', zz_test.f('student'))), 'valid'),
-  zz_test.reg('zz-five2@test.invalid', jsonb_build_object('display_name', 'No Place', 'designation_id', zz_test.f('student'))));
+  zz_test.refused(zz_test.reg('zz-five@test.invalid', jsonb_build_object('display_name', 'No Place', 'designation_id', zz_test.f('student'), 'id_number', 'ZZ-1', 'gender', 'other')), 'valid'),
+  zz_test.reg('zz-five2@test.invalid', jsonb_build_object('display_name', 'No Place', 'designation_id', zz_test.f('student'), 'id_number', 'ZZ-1', 'gender', 'other')));
 select zz_test.rec('T10 registration with an inactive place is refused',
   zz_test.refused(zz_test.reg('zz-six@test.invalid', zz_test.meta('student', 'room3')), 'valid default location'),
   zz_test.reg('zz-six2@test.invalid', zz_test.meta('student', 'room3')));
@@ -135,8 +87,8 @@ select zz_test.rec('T13 registration with a position that is not open for sign-u
 select zz_test.rec('T14 registration without details is refused, and user metadata cannot claim "provisioned"',
   zz_test.refused(zz_test.reg('zz-ten@test.invalid', '{}'::jsonb), 'needs a designation')
   and zz_test.refused(zz_test.reg('zz-ten2@test.invalid', '{"provisioned":"admin"}'::jsonb), 'needs a designation'), '');
-select zz_test.reg('zz-eleven@test.invalid', '{}'::jsonb, '{"provisioned":"admin"}'::jsonb) as registered;
-select zz_test.rec('T15 admin-provisioned accounts (app_metadata, service key only) become Community Members',
+select zz_test.reg('zz-eleven@test.invalid', jsonb_build_object('provision_secret', zz_test.sval('select secret from public._provision_secrets'))) as registered;
+select zz_test.rec('T15 admin-provisioned accounts (provision secret, service key only) become Community Members',
   zz_test.val($q$ select role::text from public.profiles where id = zz_test.uid('zz-eleven@test.invalid') $q$) = 'community', zz_test.val($q$ select role::text from public.profiles where id = zz_test.uid('zz-eleven@test.invalid') $q$));
 update public.user_types set is_active = false where id = zz_test.f('teacher')::uuid;
 select zz_test.rec('T16 a turned-off position is refused',
@@ -268,10 +220,9 @@ select zz_test.rec('T50 School Admin cannot change their own position',
   zz_test.refused(zz_test.try(format($q$ select public.admin_set_user_type(auth.uid(), %L) $q$, zz_test.f('student'))), 'your own'), '');
 select zz_test.rec('T51 School Admin cannot change a System Admin''s position',
   zz_test.refused(zz_test.try(format($q$ select public.admin_set_user_type(zz_test.uid('demo.systemadmin@sentinel.test'), %L) $q$, zz_test.f('student'))), 'only a System Admin'), '');
-select zz_test.rec('T52 School Admin can give a Community Member a School Admin position (admins are created by admins) and it is logged',
-  zz_test.try(format($q$ select public.admin_set_user_type(zz_test.uid('zz-two@test.invalid'), %L) $q$, zz_test.f('school_admin_t'))) = 'ok'
-  and zz_test.val($q$ select role::text from public.profiles where id = zz_test.uid('zz-two@test.invalid') $q$) = 'school_admin'
-  and zz_test.val($q$ select count(*) from public.audit_logs where action = 'user_type_changed' and payload ->> 'to_type' = 'School Admin' $q$)::int >= 1,
+select zz_test.rec('T52 School Admin cannot give anyone a School Admin position (only a System Admin creates admins)',
+  zz_test.refused(zz_test.try(format($q$ select public.admin_set_user_type(zz_test.uid('zz-two@test.invalid'), %L) $q$, zz_test.f('school_admin_t'))), 'only a System Admin')
+  and zz_test.val($q$ select role::text from public.profiles where id = zz_test.uid('zz-two@test.invalid') $q$) = 'community',
   zz_test.val($q$ select role::text from public.profiles where id = zz_test.uid('zz-two@test.invalid') $q$));
 select zz_test.rec('T53 School Admin cannot assign positions across schools',
   zz_test.refused(zz_test.try(format($q$ select public.admin_set_user_type(zz_test.uid('zz-eleven@test.invalid'), %L) $q$, zz_test.f('student_b'))), ''), '');
@@ -310,11 +261,3 @@ select zz_test.rec('T61b everyone holding the remapped position moves with it, a
   zz_test.val($q$ select role::text || ' / type ' || coalesce(user_type_id::text, 'none') from public.profiles where id = zz_test.uid('zz-teacher@test.invalid') $q$));
 select zz_test.rec('T62 Student cannot be remapped to School Admin while open for sign-up',
   zz_test.refused(zz_test.try(format($q$ update public.user_types set base_role = 'school_admin' where id = %L $q$, zz_test.f('student'))), 'only designations mapped to Community'), '');
--- Hand the results back as an error so that nothing is ever committed.
-reset role;
-do $do$
-declare v_out text;
-begin
-  select json_agg(json_build_object('n', n, 'name', name, 'ok', ok, 'detail', detail) order by n)::text into v_out from zz_test.res;
-  raise exception 'ZZRESULT%', v_out;
-end $do$;

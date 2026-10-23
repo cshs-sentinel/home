@@ -1,8 +1,8 @@
 # Acceptance test results: roles, registration, and default location
 
-Run on 2026-10-23 against the live Supabase project (migrations `0010` and `0011` applied) and
-the local frontend build. Nothing here was deployed to Cloudflare. The deployed app is still the
-earlier version, which does not match the migrated database (see "Not done").
+First run on 2026-10-23 for the three-role work. The button-based reporting results are in their own
+section near the end. Everything here ran against the live Supabase project and the local frontend
+build; the lists of what was not done are at the end.
 
 ## Automated results
 
@@ -66,7 +66,80 @@ until a System Admin opens one) and only active, non-restricted places.
   box is ticked.
 - Phone width (390 px): Community Member Report screen, with no horizontal overflow.
 
-## Not done, and things to know
+## Button-based reporting (migrations 0018 and 0019)
+
+Run on 2026-10-23 and 2026-10-24 against the live project.
+
+| Command | What it covers | Result |
+| --- | --- | --- |
+| `npm run build` | TypeScript check and production bundle | Passed |
+| `npm test` | 20 unit tests: the four community tabs, positions and features, button lists, default priority scores and classes, help routing, labels | 20 of 20 passed |
+| `npm run test:db` | 117 checks in three rolled-back scripts (three roles, button reporting, Classroom Adviser) | 117 of 117 passed |
+
+How the migration was checked: it was first run **inside the rolled-back test transaction**
+(`TEST_PREAPPLY=202610230018_button_reporting.sql`) with nothing changed live, then applied, then the
+suites were run again. The Classroom Adviser regression test was run **before** its fix and failed on
+exactly the bug (a switched-off pending account was listed), then passed after the fix.
+
+The older three-role suite had stopped working after the earlier registration and approval changes
+(ID No. and Gender became required, new accounts start pending, admins are no longer created by School
+Admins). Its fixtures and four checks were updated to the current rules and it passes again (65 of 65).
+The shared helpers moved to `tests/sql/_helpers.sql` and `_footer.sql`.
+
+Covered by the database checks (B01 to B40 and C01 to C07): all ten incident categories save as Pending
+Evaluation with their default S/U/A and class; the reporter cannot choose the status or priority;
+unknown categories, missing places, inactive places, and another school's places are refused; the
+actual place is stored, not the default; duplicate incidents (5 minutes) and help requests (2
+minutes) are refused; an account waiting for approval cannot report; all six help buttons save and
+are routed (urgent versus waiting for triage) whatever the browser sends; typed help needs a place;
+the six feelings save with a derived stress level; a Community Member sees only their own rows and
+cannot validate, triage, or re-prioritize; a School Admin sees everything at once, is notified,
+validates, dismisses (kept, with a reason), re-rates, and triages; dismissed reports cannot be
+validated; realtime publication; the Classroom Adviser's approvals stop at their own location and
+give none of the School Admin powers.
+
+Browser checks (Community Member, Classroom Adviser, School Admin, System Admin; desktop and 375 px):
+
+- Community Member and Classroom Adviser: four tabs, My Reports and (for the adviser) People behind More.
+- Incident category tap opens the dialog showing the category and the default location; the dropdown
+  lists the four configured places; **Cancel** closed it and the database still had 0 incidents.
+- Fire / Smoke at a **different** place (Admin): saved as pending_evaluation, location Admin, 4+4+4 =
+  12 critical, system default, one notification; the success card shows the case reference.
+- A second report straight away showed the friendly duplicate message and kept the dialog open.
+- Medical Assistance: dialog without a detail field; saved urgent; listed under My Reports.
+- Need Support saved with the optional comment and led to the Counseling / Support dialog.
+- With the default location made unavailable (simulated by rewriting the profile response, nothing
+  in the database changed): nothing preselected, Confirm disabled until a place was chosen.
+- Escape closes the dialog; category buttons are real buttons; 375 px: two columns, no horizontal
+  scroll, dialog fits the screen.
+- School Admin: the report showed in the Queue as Critical · 12 · default with Validate, Change
+  priority, and Dismiss; urgent help sorted first; a feeling filed from a separate client appeared
+  with **no refresh** (realtime); Dismiss cancelled it with a reason; Respond then Resolve moved the
+  help request; the map's All reports layer included incidents and help requests.
+- Regression: the School Admin's own tabs and legacy Report buttons, and the System Admin's tabs,
+  were unchanged.
+
+Test data created in the live school while testing: one fire report (dismissed), one medical help
+request (resolved), a "Need Support" and an "Unsafe" feeling from the demo Community Member, and a
+throwaway Classroom Adviser account that was switched off and banned afterwards. The audit log keeps
+them. No existing data was changed or removed.
+
+### Not done, and things to know
+
+- **Not deployed.** The migrations are applied to the live database, but the Cloudflare site still
+  runs the earlier frontend. Until it is deployed, the live School Admin Queue does not show
+  Pending Evaluation incidents, and Community Members still see the older Report tab.
+- **Not browser-tested:** a real sign-up through email confirmation, the Validate button in the Queue
+  (database check B30 covers the transition; the Dismiss, Respond, and Resolve buttons were clicked),
+  and a screen reader.
+- **Realtime was checked for the Queue**, not separately for the heatmap shading, which reads the
+  same refreshed data.
+- The default S/U/A scores are a proposal; they live in one SQL function and are easy to change.
+- "I'm safe" check-ins stay available but moved under Get Help; "Suggest or observe" and "Report a
+  hazard" are no longer shown to Community Members (see docs/button-reporting.md).
+
+## Earlier work: not done, and things to know (three-role batch)
+
 
 - **Not deployed.** The live site at the workers.dev URL still runs the earlier frontend, which
   expects the old role names. Until you approve a deploy, accounts on the live site may show

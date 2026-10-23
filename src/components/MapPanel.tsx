@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { HAZARDS, INCIDENTS, NEGATIVE_EMOTIONS, OBSERVATIONS, iconFor, labelFor, type Option } from '../lib/catalog';
+import { ALL_INCIDENT_CATEGORIES, HAZARDS, NEGATIVE_EMOTIONS, OBSERVATIONS, TRIAGE_LABELS, iconFor, labelFor, type Option } from '../lib/catalog';
 import type { SchoolData } from '../lib/data';
 import { blockOf, blockStyle, childrenIndex, pathTo, placeLabel, subtreeIds } from '../lib/layout';
 import { OPEN_INCIDENT, since } from '../lib/analytics';
@@ -24,7 +24,7 @@ const LAYERS: { key: Layer; label: string; roles?: Role[] }[] = [
 ];
 
 const TYPE_FILTERS: Partial<Record<Layer, Option[]>> = {
-  incidents: INCIDENTS,
+  incidents: ALL_INCIDENT_CATEGORIES,
   hazards: HAZARDS,
   concerns: OBSERVATIONS,
 };
@@ -65,14 +65,17 @@ export function MapPanel({ role, days, onDays, data }: Props) {
 
   const items: Item[] = useMemo(() => {
     const subs = since(data.submissions, days, (s) => s.created_at).filter((s) => !openOnly || s.status !== 'resolved');
-    const incs = since(data.incidents, days, (i) => i.created_at).filter((i) => !openOnly || OPEN_INCIDENT.includes(i.status));
+    // A dismissed or cancelled report is not a live report: it is not on the map.
+    const incs = since(data.incidents, days, (i) => i.created_at).filter((i) => i.status !== 'cancelled' && (!openOnly || OPEN_INCIDENT.includes(i.status)));
+    const helpItems = (): Item[] =>
+      since(data.checkIns, days, (c) => c.checked_in_at)
+        .filter((c) => c.status === 'need_help' && !(openOnly && c.triage_status === 'resolved'))
+        .map((c) => ({ id: c.id, locationId: c.location_id, icon: iconFor(c.help_type ?? 'emergency_help'), title: `${labelFor(c.help_type ?? 'emergency_help')} · ${TRIAGE_LABELS[c.triage_status ?? 'awaiting_triage']}`, when: c.checked_in_at, status: c.triage_status ?? 'help' }));
     const fromSub = (s: (typeof subs)[number]): Item => ({ id: s.id, locationId: s.location_id, icon: iconFor(s.sub_type), title: labelFor(s.sub_type), when: s.created_at, status: s.status });
     const fromInc = (i: (typeof incs)[number]): Item => ({ id: i.id, locationId: i.location_id, icon: iconFor(i.category), title: `${i.case_ref} · ${labelFor(i.category)}`, when: i.created_at, status: i.status });
     switch (layer) {
       case 'help':
-        return since(data.checkIns, days, (c) => c.checked_in_at)
-          .filter((c) => c.status === 'need_help')
-          .map((c) => ({ id: c.id, locationId: c.location_id, icon: '🆘', title: 'Help requested', when: c.checked_in_at, status: 'help' }));
+        return helpItems();
       case 'sentiment':
         return subs
           .filter((s) => s.kind === 'sentiment' && (typeFilter !== 'negative' || NEGATIVE_EMOTIONS.has(s.sub_type)))
@@ -84,9 +87,10 @@ export function MapPanel({ role, days, onDays, data }: Props) {
       case 'concerns':
         return subs.filter((s) => s.kind === 'observation' && (!typeFilter || s.sub_type === typeFilter)).map(fromSub);
       default:
-        return [...subs.filter((s) => s.kind !== 'sentiment').map(fromSub), ...incs.map(fromInc)];
+        // Every report type, so nothing a person sends is missing from the map.
+        return [...subs.filter((s) => s.kind !== 'sentiment').map(fromSub), ...incs.map(fromInc), ...(role === 'school_admin' ? helpItems() : [])];
     }
-  }, [layer, typeFilter, openOnly, days, data]);
+  }, [layer, typeFilter, openOnly, days, data, role]);
 
   if (!currentId) {
     return (
@@ -136,7 +140,7 @@ export function MapPanel({ role, days, onDays, data }: Props) {
   const selectedStats = selectedLoc ? statsFor(selectedLoc.id) : null;
   const roots = (index.get(null) ?? []).filter((r) => (index.get(r.id) ?? []).length > 0);
   const filters = layer === 'sentiment' ? [{ value: 'negative', label: 'Negative feelings only', icon: '' }] : TYPE_FILTERS[layer];
-  const canOpenOnly = layer !== 'help';
+  const canOpenOnly = true;
   const go = (id: string) => {
     setParentId(id);
     setSelected(null);

@@ -85,11 +85,14 @@ export function sentimentSummary(rows: Submission[]) {
   };
 }
 
-export const OPEN_INCIDENT: Incident['status'][] = ['new', 'acknowledged', 'assigned', 'in_progress'];
+export const OPEN_INCIDENT: Incident['status'][] = ['pending_evaluation', 'new', 'acknowledged', 'assigned', 'in_progress'];
+
+// Reports no responder has looked at yet: waiting for evaluation, or new.
+export const AWAITING_REVIEW: Incident['status'][] = ['pending_evaluation', 'new'];
 
 export function incidentSummary(incidents: Incident[], now = Date.now()) {
   const open = incidents.filter((i) => OPEN_INCIDENT.includes(i.status));
-  const unacknowledged = open.filter((i) => i.status === 'new');
+  const unacknowledged = open.filter((i) => AWAITING_REVIEW.includes(i.status));
   const overdue = unacknowledged
     .filter((i) => now - new Date(i.created_at).getTime() > 15 * 60_000)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));

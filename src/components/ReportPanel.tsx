@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { EMOTIONS, HAZARDS, INCIDENTS, OBSERVATIONS, STRESS_LEVELS, iconFor, labelFor, type Option } from '../lib/catalog';
+import { HAZARDS, INCIDENTS, LEGACY_EMOTIONS, OBSERVATIONS, STRESS_LEVELS, iconFor, labelFor, type Option } from '../lib/catalog';
 import { checkIn, raiseIncident, sendSubmission, transitionIncident } from '../lib/data';
 import { OPEN_INCIDENT } from '../lib/analytics';
 import type { CheckIn, Incident, Location, Profile } from '../lib/types';
@@ -30,7 +30,7 @@ const FLOW_FEATURE: Record<Flow, Feature> = {
 };
 
 const CHOICES: Partial<Record<Flow, { title: string; options: Option[] }>> = {
-  feel: { title: 'How are you feeling right now?', options: EMOTIONS },
+  feel: { title: 'How are you feeling right now?', options: LEGACY_EMOTIONS },
   hazard: { title: 'What did you see?', options: HAZARDS },
   incident: { title: 'What kind of incident?', options: INCIDENTS },
   observation: { title: 'What would you like to share?', options: OBSERVATIONS },

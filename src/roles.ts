@@ -5,12 +5,20 @@
 // See docs/roles-and-permissions.md.
 export type Role = 'system_admin' | 'school_admin' | 'community';
 
-export type Tab = 'report' | 'map' | 'analytics' | 'queue' | 'alerts' | 'people' | 'setup';
+// feel, incident, help, know, and mine are the Community Member tabs: Tell Us How
+// You Feel, Report an Incident, Get Help, Things You Need to Know Now, and My
+// Reports (secondary). Other roles keep the single Report tab.
+export type Tab = 'report' | 'feel' | 'incident' | 'help' | 'know' | 'mine' | 'map' | 'analytics' | 'queue' | 'alerts' | 'people' | 'setup';
 
 export const ROLE_ORDER: Role[] = ['community', 'school_admin', 'system_admin'];
 
 export const TAB_LABELS: Record<Tab, { label: string; icon: string }> = {
   report: { label: 'Report', icon: '✚' },
+  feel: { label: 'Tell Us How You Feel', icon: '💬' },
+  incident: { label: 'Report an Incident', icon: '🚨' },
+  help: { label: 'Get Help', icon: '🆘' },
+  know: { label: 'Things You Need to Know Now', icon: 'ℹ️' },
+  mine: { label: 'My Reports', icon: '📋' },
   map: { label: 'Map', icon: '🗺' },
   analytics: { label: 'Analytics', icon: '◔' },
   queue: { label: 'Queue', icon: '☰' },
