@@ -690,3 +690,193 @@ header {
   .category-button { min-height: 92px; }
   .confirm-dialog { padding: 22px 18px 18px; }
 }
+
+/* --- Soft UI (neumorphism), minimalist -------------------------------------
+   Surfaces match the page colour so depth comes from light and shadow, not
+   borders. Pressed controls sink into an inset shadow and their emoticons
+   bounce. Motion respects prefers-reduced-motion. */
+
+:root {
+  --bg: #e7ecef;
+  --surface: #e7ecef;
+  --input-bg: #e7ecef;
+  --line: transparent;
+  --border: transparent;
+  --border-strong: transparent;
+  --nm-light: #ffffff;
+  --nm-dark: #c4ccd3;
+  --nm-raise: 6px 6px 12px var(--nm-dark), -6px -6px 12px var(--nm-light);
+  --nm-raise-sm: 4px 4px 8px var(--nm-dark), -4px -4px 8px var(--nm-light);
+  --nm-inset: inset 4px 4px 8px var(--nm-dark), inset -4px -4px 8px var(--nm-light);
+  --nm-press: inset 3px 3px 6px var(--nm-dark), inset -3px -3px 6px var(--nm-light);
+  --card-shadow: var(--nm-raise);
+}
+
+:root[data-theme="dark"] {
+  --bg: #1b2f3d;
+  --surface: #1b2f3d;
+  --input-bg: #1b2f3d;
+  --nm-light: #263f4f;
+  --nm-dark: #0d1a23;
+  --card-shadow: var(--nm-raise);
+}
+
+:root[data-theme="neon"] {
+  --bg: #0b0f19;
+  --surface: #0b0f19;
+  --input-bg: #0b0f19;
+  --nm-light: #151d2e;
+  --nm-dark: #04060b;
+  --card-shadow: var(--nm-raise);
+  --glow-primary: 0 0 0 2px rgba(0, 240, 255, 0.35);
+}
+
+body { background: var(--bg); }
+
+/* Raised surfaces: cards, dialogs, menus, panels */
+.login-card, .chart-card, .confirm-dialog, .more-menu, .procedure, .alert-banner, .stress-button, .action-button, .choice-button, .category-button, .done-card, .feature-group, .tab-bar {
+  border: 0;
+  background: var(--surface);
+}
+.login-card, .chart-card, .confirm-dialog, .more-menu, .procedure, .done-card {
+  box-shadow: var(--nm-raise);
+}
+.chart-card { border-radius: 18px; padding: 22px; }
+.procedure { border-radius: 14px; }
+
+/* Buttons: raised at rest, sunk when pressed */
+button {
+  border: 0;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--nm-raise-sm);
+  border-radius: 12px;
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), color 0.2s var(--ease);
+  letter-spacing: normal;
+}
+button:hover:not(:disabled) { transform: translateY(-1px); letter-spacing: normal; }
+button:active:not(:disabled) { transform: scale(0.97); box-shadow: var(--nm-press); }
+button:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+button:disabled { opacity: 0.5; box-shadow: var(--nm-inset); cursor: default; }
+
+.big-button, .action-small, .category-button, .choice-button, .action-button, .stress-button, .secondary, .theme-toggle, .demo-accounts button, .login-card form button, .text-button {
+  border: 0;
+  box-shadow: var(--nm-raise-sm);
+}
+.big-button.primary, .action-small.primary, .login-card form button {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.big-button.danger { background: var(--danger-bg); color: var(--danger-ink); }
+.big-button.ghost, .text-button { background: var(--surface); color: var(--muted); box-shadow: none; }
+.big-button.ghost:active:not(:disabled), .text-button:active { box-shadow: var(--nm-press); }
+:root[data-theme="neon"] .login-card form button { box-shadow: var(--nm-raise-sm); }
+:root[data-theme="neon"] .login-card form button::after { display: none; }
+
+/* Inputs sit in a shallow well */
+.field input, .field textarea, .role-select, .login-card input, .confirm-dialog textarea, .confirm-dialog select {
+  border: 0;
+  background: var(--surface);
+  box-shadow: var(--nm-inset);
+  border-radius: 10px;
+}
+.field input:focus-visible, .field textarea:focus-visible, .role-select:focus-visible, .login-card input:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+/* Tabs: a sunken track with a raised active tab */
+.tab-bar { box-shadow: var(--nm-inset); padding: 6px; gap: 6px; }
+.tab-button { border-radius: 10px; color: var(--muted); box-shadow: none; }
+.tab-button:hover:not(:disabled) { transform: none; color: var(--text); }
+.tab-button.is-active {
+  background: var(--surface);
+  color: var(--heading);
+  box-shadow: var(--nm-raise-sm);
+}
+
+/* Emoticons: lift on hover, bounce on press */
+.category-icon, .choice-icon, .action-icon, .stress-button strong, .done-icon {
+  display: inline-block;
+  transition: transform 0.25s var(--ease);
+}
+button:hover:not(:disabled) .category-icon,
+button:hover:not(:disabled) .action-icon { transform: translateY(-2px) scale(1.08); }
+button:active:not(:disabled) .category-icon,
+button:active:not(:disabled) .choice-icon,
+button:active:not(:disabled) .action-icon,
+button:active:not(:disabled) .stress-button strong {
+  animation: icon-bounce 0.45s var(--ease);
+}
+.tab-button:active .tab-icon, .tab-button:active span[aria-hidden="true"] {
+  animation: icon-bounce 0.45s var(--ease);
+  display: inline-block;
+}
+
+@keyframes icon-bounce {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.78) rotate(-8deg); }
+  70% { transform: scale(1.22) rotate(4deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+/* Feeling and category grids: even, roomy, no borders */
+.category-grid { gap: 16px; }
+.category-button { min-height: 112px; border-radius: 16px; }
+.category-button.tone-warn, .category-button.tone-danger { border: 0; }
+.category-button:hover:not(:disabled) { transform: translateY(-2px); }
+.category-button:active:not(:disabled) { transform: scale(0.96); }
+.category-button:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+
+/* Alerts and status chips: soft, not boxed */
+.alert-banner { border-left: 0; }
+.chip { background: var(--surface); box-shadow: var(--nm-inset); }
+.chip-row .chip { box-shadow: var(--nm-inset); }
+
+/* Lists: separators become spacing */
+.queue-item, .alert-item, .audit-list li, .activity-list li { border-bottom: 0; padding-top: 14px; padding-bottom: 14px; }
+
+/* Dialog backdrop softens instead of darkening hard */
+.confirm-dialog::backdrop { background: rgba(35, 52, 62, 0.25); backdrop-filter: blur(2px); }
+
+/* Minimalist: remove the decorative rules that fight the soft look */
+.section-title { color: var(--heading); letter-spacing: -0.01em; }
+.eyebrow { color: var(--eyebrow); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Header controls and secondary buttons share the raised soft style */
+.secondary, .theme-toggle, .demo-accounts button {
+  background: var(--surface);
+  color: var(--link);
+  box-shadow: var(--nm-raise-sm);
+  border: 0;
+}
+.secondary:active, .theme-toggle:active, .demo-accounts button:active:not(:disabled) { box-shadow: var(--nm-press); }
+
+/* Neon keeps its accent colour for text and focus, but uses the same raised tab as the other themes */
+:root[data-theme="neon"] .tab-button.is-active { background: var(--surface); color: var(--brand); }
+
+/* Filter chips and segmented controls (Setup sections, map layers, environment) share the soft style.
+   A selected chip sinks in, like a pressed button; the group track is sunken. */
+.filter-button {
+  border: 0;
+  background: var(--surface);
+  color: var(--muted);
+  box-shadow: var(--nm-raise-sm);
+  border-radius: 999px;
+}
+.filter-button:hover:not(:disabled) { color: var(--text); }
+.filter-button.is-active {
+  background: var(--surface);
+  color: var(--heading);
+  box-shadow: var(--nm-press);
+  border: 0;
+}
+:root[data-theme="neon"] .filter-button.is-active { background: var(--surface); color: var(--brand); box-shadow: var(--nm-press); }
+:root[data-theme="neon"] .segmented .filter-button.is-active { background: var(--surface); color: var(--brand); }
+.filter-row, .segmented { box-shadow: var(--nm-inset); border: 0; background: var(--surface); padding: 4px; }
+.segmented .filter-button { box-shadow: none; background: none; }
+.segmented .filter-button.is-active { background: none; box-shadow: var(--nm-raise-sm); color: var(--heading); }
